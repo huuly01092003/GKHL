@@ -43,7 +43,7 @@
             padding: 20px;
             border-radius: 10px;
             height: 100%;
-            min-height: 200px;
+            min-height: 250px;
         }
         .gkhl-not-registered {
             background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
@@ -52,7 +52,7 @@
             text-align: center;
             color: white;
             height: 100%;
-            min-height: 200px;
+            min-height: 250px;
         }
         .location-info {
             background: #e7f3ff;
@@ -60,7 +60,7 @@
             border-left: 4px solid #667eea;
             border-radius: 10px;
             height: 100%;
-            min-height: 200px;
+            min-height: 250px;
         }
         #map {
             height: 400px;
@@ -68,6 +68,23 @@
             border-radius: 10px;
             box-shadow: 0 3px 15px rgba(0,0,0,0.1);
             margin-top: 15px;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            min-width: 150px;
+            display: inline-block;
+        }
+        .info-value {
+            color: #333;
+            font-weight: 500;
+        }
+        .section-header {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
         }
     </style>
 </head>
@@ -98,60 +115,114 @@
                 $totalSchemeAmount += $row['TotalSchemeAmount'] ?? 0;
                 $totalNetAmount += $row['TotalNetAmount'] ?? 0;
             }
+
+            // Lấy thông tin DSKH
+            $dskhInfo = $data[0]; // Thông tin từ bảng DSKH
             ?>
 
             <div class="info-card">
+                <!-- THÔNG TIN KHÁCH HÀNG -->
+                <div class="section-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Thông tin Khách hàng</h5>
+                </div>
+                
                 <div class="row">
                     <div class="col-md-6">
-                        <h5 class="text-primary mb-3"><i class="fas fa-info-circle me-2"></i>Thông tin khách hàng</h5>
-                        <table class="table table-borderless table-sm">
-                            <tr>
-                                <th width="150">Mã KH:</th>
-                                <td><strong><?= htmlspecialchars($data[0]['CustCode']) ?></strong></td>
-                            </tr>
-                            <tr>
-                                <th>Tên KH:</th>
-                                <td><?= htmlspecialchars($data[0]['ten_khach_hang'] ?? 'N/A') ?></td>
-                            </tr>
-                            <tr>
-                                <th>Địa chỉ:</th>
-                                <td><?= htmlspecialchars($data[0]['dia_chi_khach_hang'] ?? 'N/A') ?></td>
-                            </tr>
-                            <tr>
-                                <th>Tỉnh/TP:</th>
-                                <td><?= htmlspecialchars($data[0]['ma_tinh_tp'] ?? 'N/A') ?></td>
-                            </tr>
-                            <tr>
-                                <th>Loại KH:</th>
-                                <td><span class="badge bg-info"><?= htmlspecialchars($data[0]['CustType'] ?? 'N/A') ?></span></td>
-                            </tr>
-                            <tr>
-                                <th>Tháng/Năm:</th>
-                                <td><strong><?= htmlspecialchars($thangNam) ?></strong></td>
-                            </tr>
-                        </table>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-id-card me-2"></i>Mã KH:</span>
+                            <span class="info-value"><strong><?= htmlspecialchars($dskhInfo['CustCode']) ?></strong></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-user me-2"></i>Tên KH:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['ten_khach_hang'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-tag me-2"></i>Loại KH:</span>
+                            <span class="badge bg-info"><?= htmlspecialchars($dskhInfo['LoaiKH'] ?? $dskhInfo['CustType'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-map-marker-alt me-2"></i>Địa chỉ:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['dia_chi_khach_hang'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-map-signs me-2"></i>Quận/Huyện:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['QuanHuyen'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-city me-2"></i>Tỉnh/TP:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['ma_tinh_tp'] ?? 'N/A') ?></span>
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <h5 class="text-primary mb-3"><i class="fas fa-chart-line me-2"></i>Thông tin DSR</h5>
-                        <table class="table table-borderless table-sm">
-                            <tr>
-                                <th width="150">DistCode:</th>
-                                <td><?= htmlspecialchars($data[0]['DistCode'] ?? 'N/A') ?></td>
-                            </tr>
-                            <tr>
-                                <th>DSRCode:</th>
-                                <td><?= htmlspecialchars($data[0]['DSRCode'] ?? 'N/A') ?></td>
-                            </tr>
-                            <tr>
-                                <th>DistGroup:</th>
-                                <td><?= htmlspecialchars($data[0]['DistGroup'] ?? 'N/A') ?></td>
-                            </tr>
-                            <tr>
-                                <th>DSR Province:</th>
-                                <td><?= htmlspecialchars($data[0]['DSRTypeProvince'] ?? 'N/A') ?></td>
-                            </tr>
-                        </table>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-globe-asia me-2"></i>Khu vực (Area):</span>
+                            <span class="badge bg-success" style="font-size: 0.9rem; padding: 6px 12px;">
+                                <?= htmlspecialchars($dskhInfo['khu_vuc'] ?? $dskhInfo['Area'] ?? 'Chưa có') ?>
+                            </span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-id-badge me-2"></i>Mã GSBH:</span>
+                            <span class="badge bg-warning text-dark" style="font-size: 0.9rem; padding: 6px 12px;">
+                                <?= htmlspecialchars($dskhInfo['MaGSBH'] ?? 'Chưa có') ?>
+                            </span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-users-cog me-2"></i>Phân loại nhóm KH:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['PhanLoaiNhomKH'] ?? 'Chưa có') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-file-invoice me-2"></i>Mã số thuế:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['MaSoThue'] ?? 'Chưa có') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-building me-2"></i>Mã NPP:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['MaNPP'] ?? 'Chưa có') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-user-tie me-2"></i>NVBH:</span>
+                            <span class="info-value">
+                                <?php if (!empty($dskhInfo['MaNVBH'])): ?>
+                                    <strong><?= htmlspecialchars($dskhInfo['MaNVBH']) ?></strong> - 
+                                    <?= htmlspecialchars($dskhInfo['TenNVBH'] ?? '') ?>
+                                <?php else: ?>
+                                    Chưa có
+                                <?php endif; ?>
+                            </span>
+                        </div>
                     </div>
+                </div>
+
+                <!-- THÔNG TIN DSR -->
+                <div class="section-header mt-4">
+                    <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Thông tin DSR & Báo cáo</h5>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-barcode me-2"></i>DistCode:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['DistCode'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-user-tie me-2"></i>DSRCode:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['DSRCode'] ?? 'N/A') ?></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-layer-group me-2"></i>DistGroup:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['DistGroup'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="info-label"><i class="fas fa-map me-2"></i>DSR Province:</span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['DSRTypeProvince'] ?? 'N/A') ?></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <span class="info-label"><i class="fas fa-calendar-alt me-2"></i>Tháng/Năm báo cáo:</span>
+                    <span class="badge bg-primary" style="font-size: 1rem; padding: 8px 15px;"><?= htmlspecialchars($thangNam) ?></span>
                 </div>
 
                 <!-- Tổng hợp doanh số -->
@@ -187,7 +258,7 @@
                     <div class="col-md-6">
                         <?php if (!empty($location)): ?>
                             <div class="location-info">
-                                <h6><i class="fas fa-map-marker-alt me-2"></i>Thông tin Vị trí</h6>
+                                <h6 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>Thông tin Vị trí</h6>
                                 <p class="mb-2"><strong>Location:</strong></p>
                                 <p class="text-muted"><?= htmlspecialchars($location) ?></p>
                                 <?php
@@ -201,11 +272,11 @@
                             </div>
                         <?php else: ?>
                             <div class="location-info">
-                                <h6><i class="fas fa-map-marker-alt me-2"></i>Thông tin Vị trí</h6>
-                                <p class="text-muted text-center mt-5">
-                                    <i class="fas fa-map-marked-alt fa-3x mb-3 d-block"></i>
-                                    Chưa có thông tin vị trí
-                                </p>
+                                <h6 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>Thông tin Vị trí</h6>
+                                <div class="text-center" style="padding-top: 40px;">
+                                    <i class="fas fa-map-marked-alt fa-3x mb-3 d-block" style="opacity: 0.3;"></i>
+                                    <p class="text-muted">Chưa có thông tin vị trí</p>
+                                </div>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -213,26 +284,50 @@
                     <div class="col-md-6">
                         <?php if (!empty($gkhlInfo)): ?>
                             <div class="gkhl-info">
-                                <h6><i class="fas fa-handshake me-2"></i>Gắn kết Hoa Linh</h6>
+                                <h6 class="mb-3"><i class="fas fa-handshake me-2"></i>Gắn kết Hoa Linh</h6>
                                 <div class="mt-3">
-                                    <p><strong>📌 Tên Quầy:</strong> <?= htmlspecialchars($gkhlInfo['TenQuay']) ?></p>
-                                    <p><strong>📋 ĐK Chương trình:</strong> <?= htmlspecialchars($gkhlInfo['DangKyChuongTrinh'] ?? 'Chưa có') ?></p>
-                                    <p><strong>💰 ĐK Mục Doanh số:</strong> <?= htmlspecialchars($gkhlInfo['DangKyMucDoanhSo'] ?? 'Chưa có') ?></p>
-                                    <p><strong>🎨 ĐK Trưng bày:</strong> <?= htmlspecialchars($gkhlInfo['DangKyTrungBay'] ?? 'Chưa có') ?></p>
-                                    <p class="mb-0"><strong>📱 Khớp SĐT:</strong> 
+                                    <p class="mb-2"><strong>📌 Tên Quầy:</strong> <?= htmlspecialchars($gkhlInfo['TenQuay']) ?></p>
+                                    
+                                    <!-- THÊM SỐ ĐIỆN THOẠI -->
+                                    <?php if (!empty($gkhlInfo['SDTZalo'])): ?>
+                                        <p class="mb-2">
+                                            <strong>📱 SĐT Zalo:</strong> 
+                                            <a href="tel:<?= htmlspecialchars($gkhlInfo['SDTZalo']) ?>" 
+                                               style="color: white; text-decoration: underline;">
+                                                <?= htmlspecialchars($gkhlInfo['SDTZalo']) ?>
+                                            </a>
+                                        </p>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($gkhlInfo['SDTDaDinhDanh'])): ?>
+                                        <p class="mb-2">
+                                            <strong>☎️ SĐT Định danh:</strong> 
+                                            <a href="tel:<?= htmlspecialchars($gkhlInfo['SDTDaDinhDanh']) ?>" 
+                                               style="color: white; text-decoration: underline;">
+                                                <?= htmlspecialchars($gkhlInfo['SDTDaDinhDanh']) ?>
+                                            </a>
+                                        </p>
+                                    <?php endif; ?>
+                                    
+                                    <p class="mb-2"><strong>📋 ĐK Chương trình:</strong> <?= htmlspecialchars($gkhlInfo['DangKyChuongTrinh'] ?? 'Chưa có') ?></p>
+                                    <p class="mb-2"><strong>💰 ĐK Mục Doanh số:</strong> <?= htmlspecialchars($gkhlInfo['DangKyMucDoanhSo'] ?? 'Chưa có') ?></p>
+                                    <p class="mb-2"><strong>🎨 ĐK Trưng bày:</strong> <?= htmlspecialchars($gkhlInfo['DangKyTrungBay'] ?? 'Chưa có') ?></p>
+                                    <p class="mb-0"><strong>✅ Khớp SĐT:</strong> 
                                         <?php if ($gkhlInfo['KhopSDT'] == 'Y'): ?>
-                                            <i class="fas fa-check"></i> Đã khớp
+                                            <i class="fas fa-check-circle"></i> Đã khớp
                                         <?php else: ?>
-                                            <i class="fas fa-times"></i> Chưa khớp
+                                            <i class="fas fa-times-circle"></i> Chưa khớp
                                         <?php endif; ?>
                                     </p>
                                 </div>
                             </div>
                         <?php else: ?>
                             <div class="gkhl-not-registered">
-                                <i class="fas fa-info-circle fa-3x mb-3"></i>
-                                <h5 class="mb-2">Chưa tham gia GKHL</h5>
-                                <p class="mb-0">Khách hàng chưa đăng ký chương trình Gắn kết Hoa Linh</p>
+                                <div style="padding-top: 50px;">
+                                    <i class="fas fa-info-circle fa-3x mb-3"></i>
+                                    <h5 class="mb-2">Chưa tham gia GKHL</h5>
+                                    <p class="mb-0">Khách hàng chưa đăng ký chương trình Gắn kết Hoa Linh</p>
+                                </div>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -248,10 +343,10 @@
                     ?>
                     <div class="row mt-4">
                         <div class="col-12">
-                            <div class="map-container">
-                                <h6 class="mb-3"><i class="fas fa-map me-2"></i>Bản đồ vị trí</h6>
-                                <div id="map"></div>
+                            <div class="section-header">
+                                <h5 class="mb-0"><i class="fas fa-map me-2"></i>Bản đồ vị trí</h5>
                             </div>
+                            <div id="map"></div>
                         </div>
                     </div>
                     <?php } ?>
@@ -260,7 +355,10 @@
 
             <!-- Chi tiết đơn hàng -->
             <div class="data-card">
-                <h5 class="mb-4"><i class="fas fa-list me-2"></i>Chi tiết đơn hàng (<?= count($data) ?> bản ghi)</h5>
+                <div class="section-header">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Chi tiết đơn hàng <span class="badge bg-secondary"><?= count($data) ?> bản ghi</span></h5>
+                </div>
+                
                 <div class="table-responsive">
                     <table class="table table-hover table-sm detail-table">
                         <thead>

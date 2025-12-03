@@ -294,7 +294,16 @@ class OrderDetailModel {
                     o.*,
                     d.TenKH as ten_khach_hang,
                     d.DiaChi as dia_chi_khach_hang,
-                    d.Tinh as ma_tinh_tp
+                    d.Tinh as ma_tinh_tp,
+                    d.MaSoThue,
+                    d.MaGSBH,
+                    d.Area as khu_vuc,
+                    d.PhanLoaiNhomKH,
+                    d.LoaiKH,
+                    d.QuanHuyen,
+                    d.MaNPP,
+                    d.MaNVBH,
+                    d.TenNVBH
                 FROM {$this->table} o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
                 WHERE o.CustCode = :cust_code 
@@ -310,6 +319,8 @@ class OrderDetailModel {
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+
 
     public function getMonthYears() {
         $sql = "SELECT DISTINCT 
@@ -344,6 +355,8 @@ class OrderDetailModel {
         $sql = "SELECT 
                     MaKHDMS, 
                     TenQuay,
+                    SDTZalo,
+                    SDTDaDinhDanh,
                     DangKyChuongTrinh, 
                     DangKyMucDoanhSo, 
                     DangKyTrungBay,
