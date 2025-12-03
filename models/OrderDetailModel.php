@@ -32,7 +32,6 @@ class OrderDetailModel {
                 return ['success' => false, 'error' => 'Không thể mở file'];
             }
 
-            // SQL statement - INSERT IGNORE để bỏ qua duplicate
             $sql = "INSERT IGNORE INTO {$this->table} (
                 OrderNumber, OrderDate, CustCode, CustType, DistCode, DSRCode,
                 DistGroup, DSRTypeProvince, ProductSaleType, ProductCode, Qty,
@@ -44,39 +43,29 @@ class OrderDetailModel {
                 return ['success' => false, 'error' => 'Lỗi prepare SQL: ' . $this->conn->error];
             }
 
-            // Đọc file line by line
             while (($line = fgets($handle)) !== false) {
                 $lineCount++;
                 $line = trim($line);
 
-                if (empty($line)) {
-                    continue;
-                }
+                if (empty($line)) continue;
 
-                // Parse CSV
                 $row = str_getcsv($line, ',', '"');
 
-                // Skip header
                 if ($isFirstRow) {
                     $isFirstRow = false;
                     continue;
                 }
 
-                // Kiểm tra số cột (tối thiểu 17 cột, nhưng có thể có STT ở đầu)
                 if (count($row) < 16) {
                     $skippedCount++;
                     continue;
                 }
 
-                // Xử lý dữ liệu - có thể bắt đầu từ index 0 hoặc 1 tùy có STT hay không
                 $startIndex = 0;
-                
-                // Nếu cột đầu tiên là STT (số), thì bắt đầu từ index 1
                 if (!empty($row[0]) && is_numeric(trim($row[0])) && trim($row[0]) < 10000) {
-                    $startIndex = 0; // STT ở index 0, OrderNumber ở index 1
+                    $startIndex = 0;
                 }
 
-                // Chuẩn bị dữ liệu theo đúng thứ tự cột
                 $orderNumber = !empty(trim($row[$startIndex + 0])) ? trim($row[$startIndex + 0]) : null;
                 $orderDate = $this->convertDate($row[$startIndex + 1]);
                 $custCode = !empty(trim($row[$startIndex + 2])) ? trim($row[$startIndex + 2]) : null;
@@ -94,52 +83,24 @@ class OrderDetailModel {
                 $rptMonth = $this->cleanNumber($row[$startIndex + 14], true);
                 $rptYear = $this->cleanNumber($row[$startIndex + 15], true);
 
-                // Validation: OrderNumber không được trống
-                if (empty($orderNumber)) {
+                if (empty($orderNumber) || empty($custCode) || empty($orderDate)) {
                     $skippedCount++;
                     continue;
                 }
 
-                // Validation: CustCode không được trống
-                if (empty($custCode)) {
-                    $skippedCount++;
-                    continue;
-                }
-
-                // Validation: OrderDate phải hợp lệ
-                if (empty($orderDate)) {
-                    $skippedCount++;
-                    continue;
-                }
-
-                // Validation: RptMonth và RptYear phải hợp lệ
                 if (empty($rptMonth) || empty($rptYear) || $rptMonth < 1 || $rptMonth > 12) {
                     $skippedCount++;
                     continue;
                 }
 
                 $data = [
-                    $orderNumber,
-                    $orderDate,
-                    $custCode,
-                    $custType,
-                    $distCode,
-                    $dsrCode,
-                    $distGroup,
-                    $dsrTypeProvince,
-                    $productSaleType,
-                    $productCode,
-                    $qty,
-                    $totalSchemeAmount,
-                    $totalGrossAmount,
-                    $totalNetAmount,
-                    $rptMonth,
-                    $rptYear
+                    $orderNumber, $orderDate, $custCode, $custType, $distCode, $dsrCode,
+                    $distGroup, $dsrTypeProvince, $productSaleType, $productCode, $qty,
+                    $totalSchemeAmount, $totalGrossAmount, $totalNetAmount, $rptMonth, $rptYear
                 ];
 
                 $batch[] = $data;
 
-                // Thực hiện insert theo batch
                 if (count($batch) >= self::BATCH_SIZE) {
                     $result = $this->executeBatch($stmt, $batch);
                     $insertedCount += $result['inserted'];
@@ -154,7 +115,6 @@ class OrderDetailModel {
 
             fclose($handle);
 
-            // Xử lý batch cuối cùng
             if (!empty($batch)) {
                 $result = $this->executeBatch($stmt, $batch);
                 $insertedCount += $result['inserted'];
@@ -171,35 +131,13 @@ class OrderDetailModel {
                 'total_lines' => $lineCount
             ];
         } catch (Exception $e) {
-            if (isset($handle)) {
-                fclose($handle);
-            }
+            if (isset($handle)) fclose($handle);
             $this->conn->rollBack();
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
-    private function executeBatch(&$stmt, $batch) {
-        $inserted = 0;
-        $errors = 0;
-        
-        foreach ($batch as $data) {
-            try {
-                if (!$stmt->execute($data)) {
-                    $errors++;
-                    error_log("OrderDetail Insert Error: " . $stmt->error . " | Data: " . json_encode($data));
-                } else {
-                    $inserted++;
-                }
-            } catch (Exception $e) {
-                $errors++;
-                error_log("OrderDetail Exception: " . $e->getMessage() . " | Data: " . json_encode($data));
-            }
-        }
-        
-        return ['inserted' => $inserted, 'errors' => $errors];
-    }
-
+    // ✅ TỐI ƯU: Thay subquery EXISTS bằng LEFT JOIN + GROUP BY có điều kiện
     public function getCustomerSummary($rptMonth, $rptYear, $filters = []) {
         $sql = "SELECT 
                     o.CustCode as ma_khach_hang,
@@ -211,9 +149,10 @@ class OrderDetailModel {
                     SUM(o.TotalGrossAmount) as total_doanh_so_truoc_ck,
                     SUM(o.TotalSchemeAmount) as total_chiet_khau,
                     SUM(o.TotalNetAmount) as total_doanh_so,
-                    (CASE WHEN EXISTS (SELECT 1 FROM gkhl g WHERE g.MaKHDMS = o.CustCode) THEN 1 ELSE 0 END) AS has_gkhl
+                    MAX(CASE WHEN g.MaKHDMS IS NOT NULL THEN 1 ELSE 0 END) AS has_gkhl
                 FROM {$this->table} o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
+                LEFT JOIN gkhl g ON g.MaKHDMS = o.CustCode
                 WHERE o.RptMonth = :rpt_month 
                 AND o.RptYear = :rpt_year";
         
@@ -232,15 +171,16 @@ class OrderDetailModel {
             $params[':ma_khach_hang'] = '%' . $filters['ma_khach_hang'] . '%';
         }
         
+        // ✅ TỐI ƯU: Filter trong WHERE thay vì HAVING
         if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== '') {
             if ($filters['gkhl_status'] == '1') {
-                $sql .= " AND EXISTS (SELECT 1 FROM gkhl g WHERE g.MaKHDMS = o.CustCode)";
+                $sql .= " AND g.MaKHDMS IS NOT NULL";
             } else {
-                $sql .= " AND NOT EXISTS (SELECT 1 FROM gkhl g WHERE g.MaKHDMS = o.CustCode)";
+                $sql .= " AND g.MaKHDMS IS NULL";
             }
         }
         
-        $sql .= " GROUP BY o.CustCode
+        $sql .= " GROUP BY o.CustCode, d.TenKH, d.DiaChi, d.Tinh, d.LoaiKH
                   ORDER BY total_doanh_so DESC
                   LIMIT " . self::PAGE_SIZE;
         
@@ -249,12 +189,13 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // ✅ TỐI ƯU: Query summary đơn giản hơn
     public function getSummaryStats($rptMonth, $rptYear, $filters = []) {
         $sql = "SELECT 
                     COUNT(DISTINCT o.CustCode) as total_khach_hang,
-                    SUM(o.TotalNetAmount) as total_doanh_so,
-                    SUM(o.Qty) as total_san_luong,
-                    COUNT(DISTINCT CASE WHEN g.MaKHDMS IS NOT NULL THEN o.CustCode END) as total_gkhl
+                    COALESCE(SUM(o.TotalNetAmount), 0) as total_doanh_so,
+                    COALESCE(SUM(o.Qty), 0) as total_san_luong,
+                    COUNT(DISTINCT g.MaKHDMS) as total_gkhl
                 FROM {$this->table} o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
                 LEFT JOIN gkhl g ON g.MaKHDMS = o.CustCode
@@ -292,18 +233,9 @@ class OrderDetailModel {
     public function getCustomerDetail($custCode, $rptMonth, $rptYear) {
         $sql = "SELECT 
                     o.*,
-                    d.TenKH as ten_khach_hang,
-                    d.DiaChi as dia_chi_khach_hang,
-                    d.Tinh as ma_tinh_tp,
-                    d.MaSoThue,
-                    d.MaGSBH,
-                    d.Area as khu_vuc,
-                    d.PhanLoaiNhomKH,
-                    d.LoaiKH,
-                    d.QuanHuyen,
-                    d.MaNPP,
-                    d.MaNVBH,
-                    d.TenNVBH
+                    d.TenKH, d.DiaChi, d.Tinh, d.MaSoThue,
+                    d.MaGSBH, d.Area, d.PhanLoaiNhomKH, d.LoaiKH,
+                    d.QuanHuyen, d.MaNPP, d.MaNVBH, d.TenNVBH
                 FROM {$this->table} o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
                 WHERE o.CustCode = :cust_code 
@@ -320,24 +252,24 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-
-
+    // ✅ TỐI ƯU: Giới hạn 24 tháng gần nhất
     public function getMonthYears() {
         $sql = "SELECT DISTINCT 
                     CONCAT(RptMonth, '/', RptYear) as thang_nam
                 FROM {$this->table}
                 WHERE RptMonth IS NOT NULL AND RptYear IS NOT NULL
-                ORDER BY RptYear DESC, RptMonth DESC";
+                ORDER BY RptYear DESC, RptMonth DESC
+                LIMIT 24";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
     public function getProvinces() {
-        $sql = "SELECT DISTINCT d.Tinh 
-                FROM dskh d
-                WHERE d.Tinh IS NOT NULL AND d.Tinh != ''
-                ORDER BY d.Tinh";
+        $sql = "SELECT DISTINCT Tinh 
+                FROM dskh
+                WHERE Tinh IS NOT NULL AND Tinh != ''
+                ORDER BY Tinh";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -353,14 +285,9 @@ class OrderDetailModel {
 
     public function getGkhlInfo($custCode) {
         $sql = "SELECT 
-                    MaKHDMS, 
-                    TenQuay,
-                    SDTZalo,
-                    SDTDaDinhDanh,
-                    DangKyChuongTrinh, 
-                    DangKyMucDoanhSo, 
-                    DangKyTrungBay,
-                    KhopSDT
+                    MaKHDMS, TenQuay, SDTZalo, SDTDaDinhDanh,
+                    DangKyChuongTrinh, DangKyMucDoanhSo, 
+                    DangKyTrungBay, KhopSDT
                 FROM gkhl 
                 WHERE MaKHDMS = :ma_kh_dms 
                 LIMIT 1";
@@ -369,23 +296,40 @@ class OrderDetailModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    private function executeBatch(&$stmt, $batch) {
+        $inserted = 0;
+        $errors = 0;
+        
+        foreach ($batch as $data) {
+            try {
+                if (!$stmt->execute($data)) {
+                    $errors++;
+                } else {
+                    $inserted++;
+                }
+            } catch (Exception $e) {
+                $errors++;
+                error_log("OrderDetail Exception: " . $e->getMessage());
+            }
+        }
+        
+        return ['inserted' => $inserted, 'errors' => $errors];
+    }
+
     private function convertDate($dateValue) {
         if (empty($dateValue) || $dateValue === 'NULL') return null;
         
         $dateValue = trim($dateValue);
         
-        // Nếu là số (Excel serial date)
         if (is_numeric($dateValue)) {
             $unixDate = ($dateValue - 25569) * 86400;
             return date('Y-m-d', $unixDate);
         }
         
-        // Nếu là định dạng M/D/YYYY
         if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $dateValue, $matches)) {
             return $matches[3] . '-' . sprintf('%02d', $matches[1]) . '-' . sprintf('%02d', $matches[2]);
         }
         
-        // Nếu đã là YYYY-MM-DD
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateValue)) {
             return $dateValue;
         }
