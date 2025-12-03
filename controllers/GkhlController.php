@@ -19,7 +19,7 @@ class GkhlController {
         }
 
         if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
-            $_SESSION['error'] = 'Vui lòng chọn file CSV';
+            $_SESSION['error'] = '❌ Vui lòng chọn file CSV';
             header('Location: gkhl.php');
             exit;
         }
@@ -28,7 +28,7 @@ class GkhlController {
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         
         if ($ext !== 'csv') {
-            $_SESSION['error'] = 'Chỉ chấp nhận file CSV';
+            $_SESSION['error'] = '❌ Chỉ chấp nhận file CSV';
             header('Location: gkhl.php');
             exit;
         }
@@ -36,9 +36,21 @@ class GkhlController {
         $result = $this->model->importCSV($file['tmp_name']);
         
         if ($result['success']) {
-            $_SESSION['success'] = "Import thành công {$result['inserted']} bản ghi vào GKHL";
+            $message = "✅ <strong>Import GKHL thành công!</strong><br>";
+            $message .= "📊 Bản ghi thêm: <strong style='color: #28a745;'>{$result['inserted']}</strong><br>";
+            
+            if (!empty($result['skipped']) && $result['skipped'] > 0) {
+                $message .= "⏭️  Bỏ qua: <strong>{$result['skipped']}</strong> dòng (MaKHDMS trống)<br>";
+            }
+            
+            if (!empty($result['errors']) && $result['errors'] > 0) {
+                $message .= "⚠️  Lỗi FK: <strong>{$result['errors']}</strong> dòng (MaKHDMS không tồn tại trong DSKH)<br>";
+                $message .= "<small class='text-muted d-block mt-2'>💡 <strong>Gợi ý:</strong> Hãy import bảng DSKH trước, sau đó mới import GKHL</small>";
+            }
+            
+            $_SESSION['success'] = $message;
         } else {
-            $_SESSION['error'] = "Import thất bại: {$result['error']}";
+            $_SESSION['error'] = "❌ <strong>Import thất bại:</strong> {$result['error']}";
         }
 
         header('Location: gkhl.php');
@@ -53,7 +65,6 @@ class GkhlController {
             'nam_sinh' => $_GET['nam_sinh'] ?? ''
         ];
 
-        // Tối ưu: load dữ liệu với LIMIT để tránh tăng RAM quá mức
         $data = $this->model->getAll($filters);
         $saleStaff = $this->model->getSaleStaff();
         $birthYears = $this->model->getBirthYears();
@@ -63,3 +74,4 @@ class GkhlController {
         require_once 'views/gkhl/list.php';
     }
 }
+?>

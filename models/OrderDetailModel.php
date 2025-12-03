@@ -5,104 +5,201 @@ class OrderDetailModel {
     private $conn;
     private $table = "orderdetail";
     private const PAGE_SIZE = 100;
+    private const BATCH_SIZE = 500;
 
     public function __construct() {
         $database = new Database();
         $this->conn = $database->getConnection();
     }
 
-    // Import CSV từ file OrderDetail
     public function importCSV($filePath) {
         try {
+            if (!file_exists($filePath)) {
+                return ['success' => false, 'error' => 'File không tồn tại'];
+            }
+
             $this->conn->beginTransaction();
             
-            $fileContent = file_get_contents($filePath);
-            if (!mb_check_encoding($fileContent, 'UTF-8')) {
-                $fileContent = mb_convert_encoding($fileContent, 'UTF-8', 'auto');
-            }
-            
-            $rows = array_map(function($line) {
-                return str_getcsv($line, ',', '"');
-            }, explode("\n", $fileContent));
-            
-            $isFirstRow = true;
             $insertedCount = 0;
-            
-            $sql = "INSERT INTO {$this->table} (
+            $skippedCount = 0;
+            $errorCount = 0;
+            $batch = [];
+            $isFirstRow = true;
+            $lineCount = 0;
+
+            $handle = fopen($filePath, 'r');
+            if ($handle === false) {
+                return ['success' => false, 'error' => 'Không thể mở file'];
+            }
+
+            // SQL statement - INSERT IGNORE để bỏ qua duplicate
+            $sql = "INSERT IGNORE INTO {$this->table} (
                 OrderNumber, OrderDate, CustCode, CustType, DistCode, DSRCode,
                 DistGroup, DSRTypeProvince, ProductSaleType, ProductCode, Qty,
                 TotalSchemeAmount, TotalGrossAmount, TotalNetAmount, RptMonth, RptYear
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                OrderDate = VALUES(OrderDate),
-                CustType = VALUES(CustType),
-                DistCode = VALUES(DistCode),
-                DSRCode = VALUES(DSRCode),
-                DistGroup = VALUES(DistGroup),
-                DSRTypeProvince = VALUES(DSRTypeProvince),
-                ProductSaleType = VALUES(ProductSaleType),
-                ProductCode = VALUES(ProductCode),
-                Qty = VALUES(Qty),
-                TotalSchemeAmount = VALUES(TotalSchemeAmount),
-                TotalGrossAmount = VALUES(TotalGrossAmount),
-                TotalNetAmount = VALUES(TotalNetAmount),
-                RptMonth = VALUES(RptMonth),
-                RptYear = VALUES(RptYear)";
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $this->conn->prepare($sql);
-            
-            foreach ($rows as $row) {
-                if (empty($row) || count($row) < 17) {
+            if (!$stmt) {
+                return ['success' => false, 'error' => 'Lỗi prepare SQL: ' . $this->conn->error];
+            }
+
+            // Đọc file line by line
+            while (($line = fgets($handle)) !== false) {
+                $lineCount++;
+                $line = trim($line);
+
+                if (empty($line)) {
                     continue;
                 }
-                
+
+                // Parse CSV
+                $row = str_getcsv($line, ',', '"');
+
+                // Skip header
                 if ($isFirstRow) {
                     $isFirstRow = false;
                     continue;
                 }
-                
-                // Chuẩn bị dữ liệu
-                $data = [
-                    !empty(trim($row[1])) ? trim($row[1]) : null,  // OrderNumber
-                    $this->convertDate($row[2]),                    // OrderDate
-                    !empty(trim($row[3])) ? trim($row[3]) : null,  // CustCode
-                    !empty(trim($row[4])) ? trim($row[4]) : null,  // CustType
-                    !empty(trim($row[5])) ? trim($row[5]) : null,  // DistCode
-                    !empty(trim($row[6])) ? trim($row[6]) : null,  // DSRCode
-                    !empty(trim($row[7])) ? trim($row[7]) : null,  // DistGroup
-                    !empty(trim($row[8])) ? trim($row[8]) : null,  // DSRTypeProvince
-                    !empty(trim($row[9])) ? trim($row[9]) : null,  // ProductSaleType
-                    !empty(trim($row[10])) ? trim($row[10]) : null, // ProductCode
-                    $this->cleanNumber($row[11], true),             // Qty
-                    $this->cleanNumber($row[12]),                   // TotalSchemeAmount
-                    $this->cleanNumber($row[13]),                   // TotalGrossAmount
-                    $this->cleanNumber($row[14]),                   // TotalNetAmount
-                    $this->cleanNumber($row[15], true),             // RptMonth
-                    $this->cleanNumber($row[16], true)              // RptYear
-                ];
-                
-                // Bỏ qua nếu không có OrderNumber hoặc CustCode
-                if (empty($data[0]) || empty($data[2])) {
+
+                // Kiểm tra số cột (tối thiểu 17 cột, nhưng có thể có STT ở đầu)
+                if (count($row) < 16) {
+                    $skippedCount++;
                     continue;
                 }
+
+                // Xử lý dữ liệu - có thể bắt đầu từ index 0 hoặc 1 tùy có STT hay không
+                $startIndex = 0;
                 
-                $stmt->execute($data);
-                
-                if ($stmt->rowCount() > 0) {
-                    $insertedCount++;
+                // Nếu cột đầu tiên là STT (số), thì bắt đầu từ index 1
+                if (!empty($row[0]) && is_numeric(trim($row[0])) && trim($row[0]) < 10000) {
+                    $startIndex = 0; // STT ở index 0, OrderNumber ở index 1
+                }
+
+                // Chuẩn bị dữ liệu theo đúng thứ tự cột
+                $orderNumber = !empty(trim($row[$startIndex + 0])) ? trim($row[$startIndex + 0]) : null;
+                $orderDate = $this->convertDate($row[$startIndex + 1]);
+                $custCode = !empty(trim($row[$startIndex + 2])) ? trim($row[$startIndex + 2]) : null;
+                $custType = !empty(trim($row[$startIndex + 3])) ? trim($row[$startIndex + 3]) : null;
+                $distCode = !empty(trim($row[$startIndex + 4])) ? trim($row[$startIndex + 4]) : null;
+                $dsrCode = !empty(trim($row[$startIndex + 5])) ? trim($row[$startIndex + 5]) : null;
+                $distGroup = !empty(trim($row[$startIndex + 6])) ? trim($row[$startIndex + 6]) : null;
+                $dsrTypeProvince = !empty(trim($row[$startIndex + 7])) ? trim($row[$startIndex + 7]) : null;
+                $productSaleType = !empty(trim($row[$startIndex + 8])) ? trim($row[$startIndex + 8]) : null;
+                $productCode = !empty(trim($row[$startIndex + 9])) ? trim($row[$startIndex + 9]) : null;
+                $qty = $this->cleanNumber($row[$startIndex + 10], true);
+                $totalSchemeAmount = $this->cleanNumber($row[$startIndex + 11]);
+                $totalGrossAmount = $this->cleanNumber($row[$startIndex + 12]);
+                $totalNetAmount = $this->cleanNumber($row[$startIndex + 13]);
+                $rptMonth = $this->cleanNumber($row[$startIndex + 14], true);
+                $rptYear = $this->cleanNumber($row[$startIndex + 15], true);
+
+                // Validation: OrderNumber không được trống
+                if (empty($orderNumber)) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Validation: CustCode không được trống
+                if (empty($custCode)) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Validation: OrderDate phải hợp lệ
+                if (empty($orderDate)) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Validation: RptMonth và RptYear phải hợp lệ
+                if (empty($rptMonth) || empty($rptYear) || $rptMonth < 1 || $rptMonth > 12) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                $data = [
+                    $orderNumber,
+                    $orderDate,
+                    $custCode,
+                    $custType,
+                    $distCode,
+                    $dsrCode,
+                    $distGroup,
+                    $dsrTypeProvince,
+                    $productSaleType,
+                    $productCode,
+                    $qty,
+                    $totalSchemeAmount,
+                    $totalGrossAmount,
+                    $totalNetAmount,
+                    $rptMonth,
+                    $rptYear
+                ];
+
+                $batch[] = $data;
+
+                // Thực hiện insert theo batch
+                if (count($batch) >= self::BATCH_SIZE) {
+                    $result = $this->executeBatch($stmt, $batch);
+                    $insertedCount += $result['inserted'];
+                    $errorCount += $result['errors'];
+                    $batch = [];
+                    
+                    if ($lineCount % 5000 === 0) {
+                        gc_collect_cycles();
+                    }
                 }
             }
-            
+
+            fclose($handle);
+
+            // Xử lý batch cuối cùng
+            if (!empty($batch)) {
+                $result = $this->executeBatch($stmt, $batch);
+                $insertedCount += $result['inserted'];
+                $errorCount += $result['errors'];
+            }
+
             $this->conn->commit();
             
-            return ['success' => true, 'inserted' => $insertedCount];
+            return [
+                'success' => true, 
+                'inserted' => $insertedCount,
+                'skipped' => $skippedCount,
+                'errors' => $errorCount,
+                'total_lines' => $lineCount
+            ];
         } catch (Exception $e) {
+            if (isset($handle)) {
+                fclose($handle);
+            }
             $this->conn->rollBack();
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
-    // Lấy danh sách khách hàng theo tháng/năm với tổng hợp
+    private function executeBatch(&$stmt, $batch) {
+        $inserted = 0;
+        $errors = 0;
+        
+        foreach ($batch as $data) {
+            try {
+                if (!$stmt->execute($data)) {
+                    $errors++;
+                    error_log("OrderDetail Insert Error: " . $stmt->error . " | Data: " . json_encode($data));
+                } else {
+                    $inserted++;
+                }
+            } catch (Exception $e) {
+                $errors++;
+                error_log("OrderDetail Exception: " . $e->getMessage() . " | Data: " . json_encode($data));
+            }
+        }
+        
+        return ['inserted' => $inserted, 'errors' => $errors];
+    }
+
     public function getCustomerSummary($rptMonth, $rptYear, $filters = []) {
         $sql = "SELECT 
                     o.CustCode as ma_khach_hang,
@@ -152,7 +249,6 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Lấy tổng số thống kê cho dashboard
     public function getSummaryStats($rptMonth, $rptYear, $filters = []) {
         $sql = "SELECT 
                     COUNT(DISTINCT o.CustCode) as total_khach_hang,
@@ -193,7 +289,6 @@ class OrderDetailModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // Lấy chi tiết đơn hàng của khách hàng
     public function getCustomerDetail($custCode, $rptMonth, $rptYear) {
         $sql = "SELECT 
                     o.*,
@@ -216,11 +311,9 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Lấy danh sách tháng/năm có dữ liệu
     public function getMonthYears() {
         $sql = "SELECT DISTINCT 
-                    CONCAT(RptMonth, '/', RptYear) as thang_nam,
-                    RptYear, RptMonth
+                    CONCAT(RptMonth, '/', RptYear) as thang_nam
                 FROM {$this->table}
                 WHERE RptMonth IS NOT NULL AND RptYear IS NOT NULL
                 ORDER BY RptYear DESC, RptMonth DESC";
@@ -229,7 +322,6 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    // Lấy danh sách tỉnh
     public function getProvinces() {
         $sql = "SELECT DISTINCT d.Tinh 
                 FROM dskh d
@@ -240,7 +332,6 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    // Lấy thông tin vị trí khách hàng
     public function getCustomerLocation($custCode) {
         $sql = "SELECT Location FROM dskh WHERE MaKH = :ma_kh LIMIT 1";
         $stmt = $this->conn->prepare($sql);
@@ -249,7 +340,6 @@ class OrderDetailModel {
         return $result['Location'] ?? null;
     }
 
-    // Lấy thông tin GKHL
     public function getGkhlInfo($custCode) {
         $sql = "SELECT 
                     MaKHDMS, 
@@ -266,7 +356,6 @@ class OrderDetailModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // Hàm helper: Chuyển đổi ngày tháng
     private function convertDate($dateValue) {
         if (empty($dateValue) || $dateValue === 'NULL') return null;
         
@@ -296,7 +385,6 @@ class OrderDetailModel {
         return null;
     }
 
-    // Hàm helper: Làm sạch số
     private function cleanNumber($value, $asInteger = false) {
         if (empty($value) || $value === '' || $value === 'NULL') {
             return null;
@@ -305,7 +393,7 @@ class OrderDetailModel {
         $cleaned = str_replace([',', ' '], '', trim($value));
         
         if (is_numeric($cleaned)) {
-            return $asInteger ? (int)$cleaned : $cleaned;
+            return $asInteger ? (int)$cleaned : (float)$cleaned;
         }
         
         return null;

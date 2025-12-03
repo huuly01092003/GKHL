@@ -18,8 +18,6 @@ class ImportController {
             exit;
         }
 
-        // ✅ Không cần nhập tháng/năm vì đã có trong data
-        
         if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
             $_SESSION['error'] = 'Vui lòng chọn file CSV';
             header('Location: index.php');
@@ -38,9 +36,24 @@ class ImportController {
         $result = $this->model->importCSV($file['tmp_name']);
         
         if ($result['success']) {
-            $_SESSION['success'] = "Import thành công {$result['inserted']} dòng dữ liệu OrderDetail";
+            $message = "✅ <strong>Import thành công!</strong><br>";
+            $message .= "📊 Bản ghi thêm/cập nhật: <strong style='color: #28a745;'>{$result['inserted']}</strong><br>";
+            
+            if (!empty($result['skipped']) && $result['skipped'] > 0) {
+                $message .= "⏭️  Bỏ qua: <strong>{$result['skipped']}</strong> dòng (dữ liệu không đủ hoặc không hợp lệ)<br>";
+            }
+            
+            if (!empty($result['errors']) && $result['errors'] > 0) {
+                $message .= "⚠️  Lỗi: <strong>{$result['errors']}</strong> dòng<br>";
+            }
+            
+            if (!empty($result['total_lines'])) {
+                $message .= "<small class='text-muted'>📝 Tổng dòng xử lý: {$result['total_lines']}</small>";
+            }
+            
+            $_SESSION['success'] = $message;
         } else {
-            $_SESSION['error'] = "Import thất bại: {$result['error']}";
+            $_SESSION['error'] = "❌ <strong>Import thất bại:</strong> {$result['error']}";
         }
 
         header('Location: index.php');
