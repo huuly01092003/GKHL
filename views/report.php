@@ -137,7 +137,23 @@ renderNavbar($currentPage, $thangNam);
                 </div>
             </form>
         </div>
-
+<?php if (!empty($thangNam)): ?>
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-download me-2"></i>
+                    <strong>Xuất dữ liệu:</strong> 
+                    Bạn có thể xuất toàn bộ dữ liệu đang lọc ra file CSV
+                </div>
+                <a href="export.php?action=download&thang_nam=<?= urlencode($thangNam) ?>&ma_tinh_tp=<?= urlencode($filters['ma_tinh_tp']) ?>&gkhl_status=<?= urlencode($filters['gkhl_status']) ?>" 
+                   class="btn btn-success btn-sm">
+                    <i class="fas fa-file-csv me-2"></i>Export CSV
+                </a>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
         <?php if (!empty($data)): ?>
             <div class="row mb-4">
                 <div class="col-md-3">
