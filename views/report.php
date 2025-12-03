@@ -98,13 +98,14 @@ renderNavbar($currentPage, $thangNam);
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2">
+                   <div class="col-md-2">
                         <label class="form-label fw-bold">Tỉnh/Thành phố</label>
                         <select name="ma_tinh_tp" class="form-select">
                             <option value="">-- Tất cả --</option>
                             <?php foreach ($provinces as $province): ?>
-                                <option value="<?= $province ?>" <?= ($filters['ma_tinh_tp'] === $province) ? 'selected' : '' ?>>
-                                    <?= $province ?>
+                                <option value="<?= htmlspecialchars($province) ?>" 
+                                    <?= ($filters['ma_tinh_tp'] === $province) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($province) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

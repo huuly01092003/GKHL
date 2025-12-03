@@ -265,10 +265,15 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
+    // ✅ CẬP NHẬT: Lấy tỉnh từ orderdetail (có đầy đủ 37 tỉnh)
     public function getProvinces() {
-        $sql = "SELECT DISTINCT Tinh 
-                FROM dskh
-                WHERE Tinh IS NOT NULL AND Tinh != ''
+        $sql = "SELECT DISTINCT d.Tinh 
+                FROM dskh d
+                WHERE d.Tinh IS NOT NULL AND d.Tinh != ''
+                UNION
+                SELECT DISTINCT DSRTypeProvince as Tinh
+                FROM {$this->table}
+                WHERE DSRTypeProvince IS NOT NULL AND DSRTypeProvince != ''
                 ORDER BY Tinh";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
