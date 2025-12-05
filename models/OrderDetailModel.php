@@ -265,21 +265,17 @@ class OrderDetailModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    // ✅ CẬP NHẬT: Lấy tỉnh từ orderdetail (có đầy đủ 37 tỉnh)
+    // ✅ CẬP NHẬT: Lấy tỉnh mới từ dskh (join với orderdetail)
     public function getProvinces() {
         $sql = "SELECT DISTINCT d.Tinh 
                 FROM dskh d
+                INNER JOIN {$this->table} o ON o.CustCode = d.MaKH
                 WHERE d.Tinh IS NOT NULL AND d.Tinh != ''
-                UNION
-                SELECT DISTINCT DSRTypeProvince as Tinh
-                FROM {$this->table}
-                WHERE DSRTypeProvince IS NOT NULL AND DSRTypeProvince != ''
-                ORDER BY Tinh";
+                ORDER BY d.Tinh";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
-
     public function getCustomerLocation($custCode) {
         $sql = "SELECT Location FROM dskh WHERE MaKH = :ma_kh LIMIT 1";
         $stmt = $this->conn->prepare($sql);
