@@ -11,9 +11,6 @@ class AnomalyController {
         $this->orderModel = new OrderDetailModel();
     }
 
-    /**
-     * Hiển thị báo cáo khách hàng bất thường
-     */
     public function index() {
         $selectedYears = isset($_GET['years']) ? (array)$_GET['years'] : [];
         $selectedMonths = isset($_GET['months']) ? (array)$_GET['months'] : [];
@@ -21,8 +18,15 @@ class AnomalyController {
         $selectedYears = array_map('intval', array_filter($selectedYears));
         $selectedMonths = array_map('intval', array_filter($selectedMonths));
         
+        // ✅ THÊM: Lấy filters mới
+        $filters = [
+            'ma_tinh_tp' => $_GET['ma_tinh_tp'] ?? '',
+            'gkhl_status' => $_GET['gkhl_status'] ?? ''
+        ];
+        
         $availableYears = $this->orderModel->getAvailableYears();
         $availableMonths = $this->orderModel->getAvailableMonths();
+        $provinces = $this->orderModel->getProvinces(); // ✅ THÊM
         
         $data = [];
         $summary = [
@@ -34,9 +38,8 @@ class AnomalyController {
         ];
         
         if (!empty($selectedYears) && !empty($selectedMonths)) {
-            $data = $this->model->calculateAnomalyScores($selectedYears, $selectedMonths);
+            $data = $this->model->calculateAnomalyScores($selectedYears, $selectedMonths, $filters);
             
-            // Tính summary
             $summary['total_customers'] = count($data);
             foreach ($data as $item) {
                 switch ($item['risk_level']) {
@@ -55,7 +58,6 @@ class AnomalyController {
                 }
             }
             
-            // Giới hạn top 100 cho hiển thị
             $data = array_slice($data, 0, 100);
         }
         
@@ -64,9 +66,6 @@ class AnomalyController {
         require_once 'views/anomaly/report.php';
     }
 
-    /**
-     * Export CSV khách hàng bất thường
-     */
     public function exportCSV() {
         $selectedYears = isset($_GET['years']) ? (array)$_GET['years'] : [];
         $selectedMonths = isset($_GET['months']) ? (array)$_GET['months'] : [];
@@ -80,7 +79,13 @@ class AnomalyController {
             exit;
         }
         
-        $data = $this->model->calculateAnomalyScores($selectedYears, $selectedMonths);
+        // ✅ THÊM filters
+        $filters = [
+            'ma_tinh_tp' => $_GET['ma_tinh_tp'] ?? '',
+            'gkhl_status' => $_GET['gkhl_status'] ?? ''
+        ];
+        
+        $data = $this->model->calculateAnomalyScores($selectedYears, $selectedMonths, $filters);
         
         if (empty($data)) {
             $_SESSION['error'] = 'Không có dữ liệu bất thường để export';
@@ -88,7 +93,7 @@ class AnomalyController {
             exit;
         }
         
-        $fileName = $this->generateFileName($selectedYears, $selectedMonths);
+        $fileName = $this->generateFileName($selectedYears, $selectedMonths, $filters);
         
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $fileName . '"');
@@ -157,7 +162,8 @@ class AnomalyController {
         return $monthStr . ' - ' . $yearStr;
     }
 
-    private function generateFileName($years, $months) {
+    // ✅ CẬP NHẬT: Thêm filters vào filename
+    private function generateFileName($years, $months, $filters) {
         $fileName = "BaoCao_BatThuong";
         
         if (count($years) > 1) {
@@ -174,9 +180,35 @@ class AnomalyController {
             $fileName .= "_Thang" . $months[0];
         }
         
+        if (!empty($filters['ma_tinh_tp'])) {
+            $fileName .= "_" . $this->slugify($filters['ma_tinh_tp']);
+        }
+        
+        if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== '') {
+            if ($filters['gkhl_status'] === '1') {
+                $fileName .= "_CoGKHL";
+            } elseif ($filters['gkhl_status'] === '0') {
+                $fileName .= "_ChuaCoGKHL";
+            }
+        }
+        
         $fileName .= "_" . date('YmdHis') . ".csv";
         
         return $fileName;
+    }
+
+    private function slugify($text) {
+        $text = strtolower($text);
+        $text = preg_replace('/[àáảãạăằắẳẵặâầấẩẫậ]/u', 'a', $text);
+        $text = preg_replace('/[èéẻẽẹêềếểễệ]/u', 'e', $text);
+        $text = preg_replace('/[ìíỉĩị]/u', 'i', $text);
+        $text = preg_replace('/[òóỏõọôồốổỗộơờớởỡợ]/u', 'o', $text);
+        $text = preg_replace('/[ùúủũụưừứửữự]/u', 'u', $text);
+        $text = preg_replace('/[ỳýỷỹỵ]/u', 'y', $text);
+        $text = preg_replace('/[đ]/u', 'd', $text);
+        $text = preg_replace('/[^a-z0-9]+/', '_', $text);
+        $text = trim($text, '_');
+        return $text;
     }
 
     private function getRiskLevelText($level) {

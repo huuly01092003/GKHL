@@ -41,7 +41,6 @@
             color: white;
         }
         
-        /* Risk level badges and row colors */
         .risk-critical {
             background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
             color: white;
@@ -166,7 +165,7 @@
                 <i class="fas fa-shield-alt me-2"></i><strong>Hệ thống Phát hiện Hành vi Bất thường</strong>
             </h5>
             <p class="mb-0">
-                Phân tích 14 chỉ số bất thường để phát hiện khách hàng có hành vi đáng ngờ. 
+                Phân tích 15 chỉ số bất thường để phát hiện khách hàng có hành vi đáng ngờ. 
                 Điểm càng cao thể hiện mức độ nghi vấn càng lớn.
             </p>
         </div>
@@ -176,7 +175,8 @@
             
             <form method="GET" action="anomaly.php" id="filterForm">
                 <div class="row g-3">
-                    <div class="col-md-4">
+                    <!-- Năm -->
+                    <div class="col-md-3">
                         <label class="form-label fw-bold">
                             <i class="fas fa-calendar me-1"></i>Năm <span class="text-danger">*</span>
                         </label>
@@ -198,7 +198,8 @@
                         </div>
                     </div>
 
-                    <div class="col-md-4">
+                    <!-- Tháng -->
+                    <div class="col-md-3">
                         <label class="form-label fw-bold">
                             <i class="fas fa-calendar-alt me-1"></i>Tháng <span class="text-danger">*</span>
                         </label>
@@ -220,9 +221,44 @@
                         </div>
                     </div>
 
-                    <div class="col-md-4 d-flex align-items-end">
+                    <!-- ✅ THÊM: Tỉnh -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-map-marker-alt me-1"></i>Tỉnh/TP
+                        </label>
+                        <select name="ma_tinh_tp" class="form-select">
+                            <option value="">-- Tất cả --</option>
+                            <?php foreach ($provinces as $province): ?>
+                                <option value="<?= htmlspecialchars($province) ?>" 
+                                    <?= (isset($filters['ma_tinh_tp']) && $filters['ma_tinh_tp'] === $province) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($province) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- ✅ THÊM: GKHL -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-handshake me-1"></i>GKHL
+                        </label>
+                        <select name="gkhl_status" class="form-select">
+                            <option value="" <?= (isset($filters['gkhl_status']) && $filters['gkhl_status'] === '') ? 'selected' : '' ?>>
+                                -- Tất cả --
+                            </option>
+                            <option value="1" <?= (isset($filters['gkhl_status']) && $filters['gkhl_status'] === '1') ? 'selected' : '' ?>>
+                                ✅ Có GKHL
+                            </option>
+                            <option value="0" <?= (isset($filters['gkhl_status']) && $filters['gkhl_status'] === '0') ? 'selected' : '' ?>>
+                                ❌ Chưa có GKHL
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Nút phân tích -->
+                    <div class="col-md-2 d-flex align-items-end">
                         <button type="submit" class="btn btn-danger btn-lg w-100">
-                            <i class="fas fa-search me-2"></i>Phân tích Bất thường
+                            <i class="fas fa-search me-2"></i>Phân tích
                         </button>
                     </div>
                 </div>
@@ -234,6 +270,13 @@
                 <h5 class="mb-0">
                     <i class="fas fa-calendar-check me-2"></i>
                     Kỳ phân tích: <strong><?= htmlspecialchars($periodDisplay) ?></strong>
+                    <?php if (!empty($filters['ma_tinh_tp'])): ?>
+                        | <i class="fas fa-map-marker-alt me-1"></i> <?= htmlspecialchars($filters['ma_tinh_tp']) ?>
+                    <?php endif; ?>
+                    <?php if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== ''): ?>
+                        | <i class="fas fa-handshake me-1"></i> 
+                        <?= $filters['gkhl_status'] === '1' ? 'Chỉ KH có GKHL' : 'Chỉ KH chưa có GKHL' ?>
+                    <?php endif; ?>
                 </h5>
             </div>
         <?php endif; ?>
@@ -250,9 +293,15 @@
                         <?php 
                         $yearsParam = http_build_query(['years' => $selectedYears]);
                         $monthsParam = http_build_query(['months' => $selectedMonths]);
+                        $exportUrl = "anomaly.php?action=export&{$yearsParam}&{$monthsParam}";
+                        if (!empty($filters['ma_tinh_tp'])) {
+                            $exportUrl .= '&ma_tinh_tp=' . urlencode($filters['ma_tinh_tp']);
+                        }
+                        if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== '') {
+                            $exportUrl .= '&gkhl_status=' . urlencode($filters['gkhl_status']);
+                        }
                         ?>
-                        <a href="anomaly.php?action=export&<?= $yearsParam ?>&<?= $monthsParam ?>" 
-                           class="btn btn-export-anomaly">
+                        <a href="<?= $exportUrl ?>" class="btn btn-export-anomaly">
                             <i class="fas fa-file-csv me-2"></i>Export CSV
                         </a>
                     </div>
