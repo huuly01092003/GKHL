@@ -26,6 +26,12 @@ function renderNavbar($currentPage = '', $thangNam = '') {
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link <?= $currentPage === 'anomaly' ? 'active' : '' ?>" href="anomaly.php">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <span style="color: #fff3cd;">Phát hiện BT</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link <?= $currentPage === 'dskh' ? 'active' : '' ?>" href="dskh.php">
                         <i class="fas fa-users me-1"></i>DSKH
                     </a>
@@ -56,6 +62,12 @@ function renderNavbar($currentPage = '', $thangNam = '') {
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="dskh.php?action=list"><i class="fas fa-list me-2"></i>Xem DSKH</a></li>
                         <li><a class="dropdown-item" href="gkhl.php?action=list"><i class="fas fa-list me-2"></i>Xem GKHL</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item" href="anomaly.php" style="color: #dc3545; font-weight: 600;">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Phát hiện Bất thường
+                            </a>
+                        </li>
                     </ul>
                 </li>
             </ul>

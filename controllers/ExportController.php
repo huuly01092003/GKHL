@@ -9,29 +9,24 @@ class ExportController {
     }
 
     public function exportCSV() {
-        // ✅ CẬP NHẬT: Lấy nhiều năm và nhiều tháng
         $selectedYears = isset($_GET['years']) ? (array)$_GET['years'] : [];
         $selectedMonths = isset($_GET['months']) ? (array)$_GET['months'] : [];
         
-        // Chuyển đổi sang array số nguyên
         $selectedYears = array_map('intval', array_filter($selectedYears));
         $selectedMonths = array_map('intval', array_filter($selectedMonths));
         
-        // Validate
         if (empty($selectedYears) || empty($selectedMonths)) {
             $_SESSION['error'] = 'Vui lòng chọn năm và tháng để export';
             header('Location: report.php');
             exit;
         }
 
-        // Lấy filters khác
         $filters = [
             'ma_tinh_tp' => $_GET['ma_tinh_tp'] ?? '',
             'ma_khach_hang' => $_GET['ma_khach_hang'] ?? '',
             'gkhl_status' => $_GET['gkhl_status'] ?? ''
         ];
 
-        // Lấy dữ liệu
         $data = $this->model->getExportData($selectedYears, $selectedMonths, $filters);
 
         if (empty($data)) {
@@ -41,22 +36,17 @@ class ExportController {
             exit;
         }
 
-        // Tạo tên file
         $fileName = $this->generateFileName($selectedYears, $selectedMonths, $filters);
 
-        // Set headers để download file
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $fileName . '"');
         header('Pragma: no-cache');
         header('Expires: 0');
 
-        // Mở output stream
         $output = fopen('php://output', 'w');
-
-        // Thêm BOM cho UTF-8 (để Excel hiển thị đúng tiếng Việt)
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
-        // Header CSV
+        // ✅ CẬP NHẬT: Thêm các cột bất thường
         $headers = [
             'STT',
             'Mã KH',
@@ -91,13 +81,19 @@ class ExportController {
             'Khớp SĐT',
             'ĐK Chương trình',
             'ĐK Mục doanh số',
-            'ĐK Trưng bày'
+            'ĐK Trưng bày',
+            '⚠️ ĐIỂM BẤT THƯỜNG',
+            '⚠️ MỨC ĐỘ NGUY CƠ',
+            '⚠️ SỐ DẤU HIỆU',
+            '⚠️ CHI TIẾT BẤT THƯỜNG'
         ];
 
         fputcsv($output, $headers);
 
-        // Ghi dữ liệu
         foreach ($data as $index => $row) {
+            // Chuyển đổi risk level sang text
+            $riskLevelText = $this->getRiskLevelText($row['anomaly_risk_level']);
+            
             $csvRow = [
                 $index + 1,
                 $row['ma_khach_hang'] ?? '',
@@ -114,8 +110,8 @@ class ExportController {
                 $row['ma_nvbh'] ?? '',
                 $row['ten_nvbh'] ?? '',
                 $row['location'] ?? '',
-                implode(', ', $selectedYears), // Năm
-                implode(', ', $selectedMonths), // Tháng
+                implode(', ', $selectedYears),
+                implode(', ', $selectedMonths),
                 $row['so_don_hang'] ?? 0,
                 $row['total_san_luong'] ?? 0,
                 $row['total_doanh_so_truoc_ck'] ?? 0,
@@ -132,7 +128,12 @@ class ExportController {
                 $row['gkhl_khop_sdt'] ?? '',
                 $row['gkhl_dk_chuong_trinh'] ?? '',
                 $row['gkhl_dk_muc_doanh_so'] ?? '',
-                $row['gkhl_dk_trung_bay'] ?? ''
+                $row['gkhl_dk_trung_bay'] ?? '',
+                // ✅ CÁC CỘT BẤT THƯỜNG MỚI
+                number_format($row['anomaly_score'], 1),
+                $riskLevelText,
+                $row['anomaly_count'],
+                $row['anomaly_details']
             ];
 
             fputcsv($output, $csvRow);
@@ -145,14 +146,12 @@ class ExportController {
     private function generateFileName($years, $months, $filters) {
         $fileName = "BaoCao_KhachHang";
         
-        // Thêm năm
         if (count($years) > 1) {
             $fileName .= "_Nam" . min($years) . "-" . max($years);
         } else {
             $fileName .= "_Nam" . $years[0];
         }
         
-        // Thêm tháng
         if (count($months) == 12) {
             $fileName .= "_TatCaThang";
         } elseif (count($months) > 1) {
@@ -161,12 +160,10 @@ class ExportController {
             $fileName .= "_Thang" . $months[0];
         }
         
-        // Thêm tỉnh
         if (!empty($filters['ma_tinh_tp'])) {
             $fileName .= "_" . $this->slugify($filters['ma_tinh_tp']);
         }
         
-        // Thêm GKHL status
         if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== '') {
             if ($filters['gkhl_status'] === '1') {
                 $fileName .= "_CoGKHL";
@@ -181,7 +178,6 @@ class ExportController {
     }
 
     private function slugify($text) {
-        // Chuyển tiếng Việt không dấu
         $text = strtolower($text);
         $text = preg_replace('/[àáảãạăằắẳẵặâầấẩẫậ]/u', 'a', $text);
         $text = preg_replace('/[èéẻẽẹêềếểễệ]/u', 'e', $text);
@@ -193,6 +189,18 @@ class ExportController {
         $text = preg_replace('/[^a-z0-9]+/', '_', $text);
         $text = trim($text, '_');
         return $text;
+    }
+
+    private function getRiskLevelText($level) {
+        $levels = [
+            'critical' => '🔴 CỰC KỲ NGHIÊM TRỌNG',
+            'high' => '🟠 NGHI VẤN CAO',
+            'medium' => '🟡 Nghi vấn trung bình',
+            'low' => '🟢 Nghi vấn thấp',
+            'normal' => '✅ Bình thường'
+        ];
+        
+        return $levels[$level] ?? 'Không xác định';
     }
 }
 ?>

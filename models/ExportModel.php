@@ -1,17 +1,19 @@
 <?php
 require_once 'config/database.php';
+require_once 'models/AnomalyDetectionModel.php';
 
 class ExportModel {
     private $conn;
+    private $anomalyModel;
 
     public function __construct() {
         $database = new Database();
         $this->conn = $database->getConnection();
+        $this->anomalyModel = new AnomalyDetectionModel();
     }
 
     /**
-     * ✅ CẬP NHẬT: Hỗ trợ nhiều năm và nhiều tháng
-     * Lấy dữ liệu đầy đủ để export
+     * ✅ CẬP NHẬT: Lấy dữ liệu export kèm theo thông tin bất thường
      */
     public function getExportData($years = [], $months = [], $filters = []) {
         $sql = "SELECT 
@@ -56,7 +58,6 @@ class ExportModel {
         
         $params = [];
         
-        // ✅ Filter theo nhiều năm
         if (!empty($years)) {
             $placeholders = [];
             foreach ($years as $idx => $year) {
@@ -67,7 +68,6 @@ class ExportModel {
             $sql .= " AND o.RptYear IN (" . implode(',', $placeholders) . ")";
         }
         
-        // ✅ Filter theo nhiều tháng
         if (!empty($months)) {
             $placeholders = [];
             foreach ($months as $idx => $month) {
@@ -78,19 +78,16 @@ class ExportModel {
             $sql .= " AND o.RptMonth IN (" . implode(',', $placeholders) . ")";
         }
         
-        // Lọc theo tỉnh
         if (!empty($filters['ma_tinh_tp'])) {
             $sql .= " AND d.Tinh = :ma_tinh_tp";
             $params[':ma_tinh_tp'] = $filters['ma_tinh_tp'];
         }
         
-        // Lọc theo mã KH
         if (!empty($filters['ma_khach_hang'])) {
             $sql .= " AND o.CustCode LIKE :ma_khach_hang";
             $params[':ma_khach_hang'] = '%' . $filters['ma_khach_hang'] . '%';
         }
         
-        // Lọc theo trạng thái GKHL
         if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== '') {
             if ($filters['gkhl_status'] === '1') {
                 $sql .= " AND g.MaKHDMS IS NOT NULL";
@@ -106,12 +103,43 @@ class ExportModel {
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // ✅ THÊM MỚI: Tính điểm bất thường cho từng khách hàng
+        $anomalyScores = $this->anomalyModel->calculateAnomalyScores($years, $months);
+        
+        // Tạo map để tra cứu nhanh
+        $anomalyMap = [];
+        foreach ($anomalyScores as $anomaly) {
+            $anomalyMap[$anomaly['customer_code']] = [
+                'score' => $anomaly['total_score'],
+                'risk_level' => $anomaly['risk_level'],
+                'anomaly_count' => count($anomaly['details']),
+                'details' => array_map(function($d) {
+                    return $d['description'];
+                }, array_slice($anomaly['details'], 0, 3)) // Top 3 dấu hiệu
+            ];
+        }
+        
+        // Gắn thông tin bất thường vào data
+        foreach ($data as &$row) {
+            $custCode = $row['ma_khach_hang'];
+            if (isset($anomalyMap[$custCode])) {
+                $row['anomaly_score'] = $anomalyMap[$custCode]['score'];
+                $row['anomaly_risk_level'] = $anomalyMap[$custCode]['risk_level'];
+                $row['anomaly_count'] = $anomalyMap[$custCode]['anomaly_count'];
+                $row['anomaly_details'] = implode(' | ', $anomalyMap[$custCode]['details']);
+            } else {
+                $row['anomaly_score'] = 0;
+                $row['anomaly_risk_level'] = 'normal';
+                $row['anomaly_count'] = 0;
+                $row['anomaly_details'] = 'Không phát hiện bất thường';
+            }
+        }
+        
+        return $data;
     }
 
-    /**
-     * Lấy danh sách năm có dữ liệu
-     */
     public function getAvailableYears() {
         $sql = "SELECT DISTINCT RptYear 
                 FROM orderdetail
@@ -123,16 +151,10 @@ class ExportModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    /**
-     * Lấy danh sách tháng (1-12)
-     */
     public function getAvailableMonths() {
         return range(1, 12);
     }
 
-    /**
-     * Lấy danh sách tỉnh
-     */
     public function getProvinces() {
         $sql = "SELECT DISTINCT d.Tinh 
                 FROM dskh d

@@ -357,7 +357,164 @@
                         <?php endif; ?>
                     </div>
                 </div>
+                 <!-- Thông tin Bất thường -->
+                <?php if (!empty($anomalyInfo) && $anomalyInfo['total_score'] > 0): ?>
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="section-header" style="background: linear-gradient(135deg, #ff6b6b15 0%, #ee5a6f15 100%); border-left-color: #dc3545;">
+                            <h5 class="mb-0" style="color: #dc3545;">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Phát hiện Hành vi Bất thường
+                            </h5>
+                        </div>
+                        
+                        <div class="anomaly-alert-box" style="
+                            background: <?php
+                                if ($anomalyInfo['risk_level'] === 'critical') echo 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+                                elseif ($anomalyInfo['risk_level'] === 'high') echo 'linear-gradient(135deg, #fd7e14 0%, #e8590c 100%)';
+                                elseif ($anomalyInfo['risk_level'] === 'medium') echo 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)';
+                                else echo 'linear-gradient(135deg, #20c997 0%, #17a589 100%)';
+                            ?>;
+                            color: <?= $anomalyInfo['risk_level'] === 'medium' ? '#000' : 'white' ?>;
+                            padding: 25px;
+                            border-radius: 15px;
+                            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+                            margin-bottom: 20px;
+                        ">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h4 class="mb-2">
+                                        <?php
+                                        $riskIcons = [
+                                            'critical' => '🔴',
+                                            'high' => '🟠',
+                                            'medium' => '🟡',
+                                            'low' => '🟢'
+                                        ];
+                                        $riskTexts = [
+                                            'critical' => 'CỰC KỲ NGHIÊM TRỌNG',
+                                            'high' => 'NGHI VẤN CAO',
+                                            'medium' => 'NGHI VẤN TRUNG BÌNH',
+                                            'low' => 'NGHI VẤN THẤP'
+                                        ];
+                                        echo $riskIcons[$anomalyInfo['risk_level']] . ' ' . $riskTexts[$anomalyInfo['risk_level']];
+                                        ?>
+                                    </h4>
+                                    <p class="mb-0" style="font-size: 1.1rem;">
+                                        Phát hiện <strong><?= $anomalyInfo['anomaly_count'] ?> dấu hiệu bất thường</strong> 
+                                        trong hành vi mua hàng của khách hàng này
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div style="
+                                        background: <?= $anomalyInfo['risk_level'] === 'medium' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)' ?>;
+                                        padding: 20px;
+                                        border-radius: 15px;
+                                        display: inline-block;
+                                    ">
+                                        <div style="font-size: 2.5rem; font-weight: 700; margin-bottom: 5px;">
+                                            <?= number_format($anomalyInfo['total_score'], 1) ?>
+                                        </div>
+                                        <div style="font-size: 0.9rem; font-weight: 600; opacity: 0.9;">
+                                            ĐIỂM BẤT THƯỜNG
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
+                        <!-- Chi tiết các dấu hiệu bất thường -->
+                        <div class="row">
+                            <?php foreach ($anomalyInfo['details'] as $index => $detail): ?>
+                            <div class="col-md-6 mb-3">
+                                <div class="anomaly-detail-card" style="
+                                    background: white;
+                                    padding: 15px;
+                                    border-radius: 10px;
+                                    border-left: 4px solid <?php
+                                        if ($detail['weighted_score'] >= 15) echo '#dc3545';
+                                        elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
+                                        elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
+                                        else echo '#20c997';
+                                    ?>;
+                                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                                ">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0" style="flex: 1;">
+                                            <i class="fas fa-exclamation-circle me-2" style="color: <?php
+                                                if ($detail['weighted_score'] >= 15) echo '#dc3545';
+                                                elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
+                                                elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
+                                                else echo '#20c997';
+                                            ?>;"></i>
+                                            <?= htmlspecialchars($detail['description']) ?>
+                                        </h6>
+                                        <span class="badge" style="
+                                            background: <?php
+                                                if ($detail['weighted_score'] >= 15) echo '#dc3545';
+                                                elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
+                                                elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
+                                                else echo '#20c997';
+                                            ?>;
+                                            color: <?= $detail['weighted_score'] >= 5 && $detail['weighted_score'] < 15 ? '#000' : 'white' ?>;
+                                            font-size: 0.85rem;
+                                            padding: 5px 10px;
+                                        ">
+                                            <?= round($detail['weighted_score'], 1) ?> điểm
+                                        </span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.85rem;">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Điểm gốc: <?= $detail['score'] ?>/100 
+                                        | Trọng số: <?= $detail['weight'] ?>%
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <!-- Khuyến nghị -->
+                        <div class="alert alert-info mt-3">
+                            <h6 class="mb-2">
+                                <i class="fas fa-lightbulb me-2"></i><strong>Khuyến nghị hành động:</strong>
+                            </h6>
+                            <ul class="mb-0">
+                                <?php if ($anomalyInfo['risk_level'] === 'critical'): ?>
+                                    <li><strong>Kiểm tra ngay lập tức:</strong> Liên hệ NVBH phụ trách để xác minh các đơn hàng</li>
+                                    <li><strong>Xem xét giao dịch:</strong> Rà soát lại lịch sử giao dịch chi tiết</li>
+                                    <li><strong>Đối chiếu GKHL:</strong> Kiểm tra tính hợp lệ của chương trình tham gia</li>
+                                <?php elseif ($anomalyInfo['risk_level'] === 'high'): ?>
+                                    <li><strong>Theo dõi sát:</strong> Giám sát hành vi mua hàng trong các tháng tiếp theo</li>
+                                    <li><strong>Xác minh thông tin:</strong> Liên hệ xác nhận với NVBH hoặc khách hàng</li>
+                                <?php elseif ($anomalyInfo['risk_level'] === 'medium'): ?>
+                                    <li><strong>Ghi nhận:</strong> Lưu ý theo dõi trong kỳ báo cáo tiếp theo</li>
+                                    <li><strong>Phân tích xu hướng:</strong> So sánh với các tháng trước để đánh giá</li>
+                                <?php else: ?>
+                                    <li><strong>Theo dõi thường xuyên:</strong> Duy trì giám sát định kỳ</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <?php elseif (!empty($anomalyInfo)): ?>
+                <!-- Không phát hiện bất thường -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="alert alert-success" style="
+                            background: linear-gradient(135deg, #28a74515 0%, #20c99715 100%);
+                            border-left: 4px solid #28a745;
+                            border-radius: 10px;
+                        ">
+                            <h6 class="mb-2">
+                                <i class="fas fa-check-circle me-2"></i><strong>Hành vi Bình thường</strong>
+                            </h6>
+                            <p class="mb-0">
+                                Không phát hiện dấu hiệu bất thường trong hành vi mua hàng của khách hàng này trong kỳ báo cáo.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>               
                 <!-- Map -->
                 <?php if (!empty($location)): ?>
                     <?php

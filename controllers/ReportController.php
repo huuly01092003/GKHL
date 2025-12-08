@@ -1,19 +1,20 @@
 <?php
 require_once 'models/OrderDetailModel.php';
+require_once 'models/AnomalyDetectionModel.php';
 
 class ReportController {
     private $model;
+    private $anomalyModel;
 
     public function __construct() {
         $this->model = new OrderDetailModel();
+        $this->anomalyModel = new AnomalyDetectionModel();
     }
 
     public function index() {
-        // ✅ CẬP NHẬT: Lấy năm và tháng từ query string (có thể nhiều giá trị)
         $selectedYears = isset($_GET['years']) ? (array)$_GET['years'] : [];
         $selectedMonths = isset($_GET['months']) ? (array)$_GET['months'] : [];
         
-        // Chuyển đổi sang array số nguyên
         $selectedYears = array_map('intval', array_filter($selectedYears));
         $selectedMonths = array_map('intval', array_filter($selectedMonths));
         
@@ -35,13 +36,11 @@ class ReportController {
         $availableYears = $this->model->getAvailableYears();
         $availableMonths = $this->model->getAvailableMonths();
 
-        // Nếu đã chọn năm và tháng
         if (!empty($selectedYears) && !empty($selectedMonths)) {
             $data = $this->model->getCustomerSummary($selectedYears, $selectedMonths, $filters);
             $summary = $this->model->getSummaryStats($selectedYears, $selectedMonths, $filters);
         }
 
-        // Tạo chuỗi hiển thị cho breadcrumb
         $periodDisplay = $this->generatePeriodDisplay($selectedYears, $selectedMonths);
 
         require_once 'views/report.php';
@@ -57,7 +56,6 @@ class ReportController {
             exit;
         }
         
-        // Chuyển đổi sang array số nguyên
         $selectedYears = array_map('intval', array_filter($selectedYears));
         $selectedMonths = array_map('intval', array_filter($selectedMonths));
 
@@ -65,15 +63,14 @@ class ReportController {
         $location = $this->model->getCustomerLocation($maKhachHang);
         $gkhlInfo = $this->model->getGkhlInfo($maKhachHang);
         
-        // Tạo chuỗi hiển thị kỳ báo cáo
+        // ✅ THÊM MỚI: Lấy thông tin bất thường
+        $anomalyInfo = $this->anomalyModel->getCustomerAnomalyDetail($maKhachHang, $selectedYears, $selectedMonths);
+        
         $periodDisplay = $this->generatePeriodDisplay($selectedYears, $selectedMonths);
         
         require_once 'views/detail.php';
     }
 
-    /**
-     * Tạo chuỗi hiển thị cho kỳ báo cáo
-     */
     private function generatePeriodDisplay($years, $months) {
         if (empty($years) || empty($months)) {
             return '';
