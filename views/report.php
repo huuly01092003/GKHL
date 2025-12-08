@@ -1,9 +1,7 @@
 <?php
-$thangNam = $_GET['thang_nam'] ?? '';
 $currentPage = 'report';
-
 require_once __DIR__ . '/components/navbar.php';
-renderNavbar($currentPage, $thangNam);
+renderNavbar($currentPage, $periodDisplay ?? '');
 ?>
 
 <!DOCTYPE html>
@@ -15,6 +13,8 @@ renderNavbar($currentPage, $thangNam);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <style>
         body { background: #f5f7fa; }
         .navbar-custom {
@@ -68,6 +68,22 @@ renderNavbar($currentPage, $thangNam);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
             color: white;
         }
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: 38px;
+        }
+        .quick-select-btn {
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            margin: 2px;
+        }
+        .period-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -85,20 +101,69 @@ renderNavbar($currentPage, $thangNam);
     <div class="container-fluid mt-4">
         <div class="filter-card">
             <h5 class="mb-4"><i class="fas fa-filter me-2"></i>Bộ lọc dữ liệu</h5>
-            <form method="GET" action="report.php">
+            
+            <form method="GET" action="report.php" id="filterForm">
                 <div class="row g-3">
+                    <!-- Năm -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">Tháng/Năm</label>
-                        <select name="thang_nam" class="form-select" required>
-                            <option value="">-- Chọn tháng/năm --</option>
-                            <?php foreach ($monthYears as $my): ?>
-                                <option value="<?= $my ?>" <?= ($thangNam === $my) ? 'selected' : '' ?>>
-                                    Tháng <?= $my ?>
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-calendar me-1"></i>Năm <span class="text-danger">*</span>
+                        </label>
+                        <select name="years[]" id="yearSelect" class="form-select" multiple required>
+                            <?php foreach ($availableYears as $year): ?>
+                                <option value="<?= $year ?>" 
+                                    <?= in_array($year, $selectedYears) ? 'selected' : '' ?>>
+                                    <?= $year ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary quick-select-btn" onclick="selectAllYears()">
+                                <i class="fas fa-check-double"></i> Tất cả
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-select-btn" onclick="clearYears()">
+                                <i class="fas fa-times"></i> Xóa
+                            </button>
+                        </div>
                     </div>
-                   <div class="col-md-2">
+
+                    <!-- Tháng -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-calendar-alt me-1"></i>Tháng <span class="text-danger">*</span>
+                        </label>
+                        <select name="months[]" id="monthSelect" class="form-select" multiple required>
+                            <?php foreach ($availableMonths as $month): ?>
+                                <option value="<?= $month ?>" 
+                                    <?= in_array($month, $selectedMonths) ? 'selected' : '' ?>>
+                                    Tháng <?= $month ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary quick-select-btn" onclick="selectAllMonths()">
+                                <i class="fas fa-check-double"></i> Tất cả
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary quick-select-btn" onclick="clearMonths()">
+                                <i class="fas fa-times"></i> Xóa
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info quick-select-btn" onclick="selectQuarter(1)">
+                                Q1
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info quick-select-btn" onclick="selectQuarter(2)">
+                                Q2
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info quick-select-btn" onclick="selectQuarter(3)">
+                                Q3
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info quick-select-btn" onclick="selectQuarter(4)">
+                                Q4
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tỉnh -->
+                    <div class="col-md-2">
                         <label class="form-label fw-bold">Tỉnh/Thành phố</label>
                         <select name="ma_tinh_tp" class="form-select">
                             <option value="">-- Tất cả --</option>
@@ -110,51 +175,72 @@ renderNavbar($currentPage, $thangNam);
                             <?php endforeach; ?>
                         </select>
                     </div>
+
+                    <!-- Mã KH -->
                     <div class="col-md-2">
                         <label class="form-label fw-bold">Mã khách hàng</label>
                         <input type="text" name="ma_khach_hang" class="form-control" 
                                placeholder="Nhập mã KH..." value="<?= htmlspecialchars($filters['ma_khach_hang']) ?>">
                     </div>
-                    <div class="col-md-3">
+
+                    <!-- GKHL -->
+                    <div class="col-md-2">
                         <label class="form-label fw-bold">
                             <i class="fas fa-handshake me-1"></i>Trạng thái GKHL
                         </label>
                         <select name="gkhl_status" class="form-select">
                             <option value="" <?= ($filters['gkhl_status'] === '') ? 'selected' : '' ?>>-- Tất cả --</option>
                             <option value="1" <?= ($filters['gkhl_status'] === '1') ? 'selected' : '' ?>>
-                                ✅ Đã tham gia GKHL
+                                ✅ Đã tham gia
                             </option>
                             <option value="0" <?= ($filters['gkhl_status'] === '0') ? 'selected' : '' ?>>
-                                ❌ Chưa tham gia GKHL
+                                ❌ Chưa tham gia
                             </option>
                         </select>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100">
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
                             <i class="fas fa-search me-2"></i>Tìm kiếm
                         </button>
                     </div>
                 </div>
             </form>
         </div>
-<?php if (!empty($thangNam)): ?>
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="alert alert-info d-flex justify-content-between align-items-center">
-                <div>
-                    <i class="fas fa-download me-2"></i>
-                    <strong>Xuất dữ liệu:</strong> 
-                    Bạn có thể xuất toàn bộ dữ liệu đang lọc ra file CSV
-                </div>
-                <a href="export.php?action=download&thang_nam=<?= urlencode($thangNam) ?>&ma_tinh_tp=<?= urlencode($filters['ma_tinh_tp']) ?>&gkhl_status=<?= urlencode($filters['gkhl_status']) ?>" 
-                   class="btn btn-success btn-sm">
-                    <i class="fas fa-file-csv me-2"></i>Export CSV
-                </a>
+
+        <?php if (!empty($periodDisplay)): ?>
+            <div class="period-display">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-check me-2"></i>
+                    Kỳ báo cáo: <strong><?= htmlspecialchars($periodDisplay) ?></strong>
+                </h5>
             </div>
-        </div>
-    </div>
-<?php endif; ?>
+        <?php endif; ?>
+
         <?php if (!empty($data)): ?>
+            <!-- ✅ THÊM NÚT EXPORT -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="alert alert-success d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-download me-2"></i>
+                            <strong>Xuất dữ liệu:</strong> 
+                            Export <?= number_format($summary['total_khach_hang']) ?> khách hàng theo kết quả tìm kiếm
+                        </div>
+                        <?php 
+                        $yearsParam = http_build_query(['years' => $selectedYears]);
+                        $monthsParam = http_build_query(['months' => $selectedMonths]);
+                        ?>
+                        <a href="export.php?action=download&<?= $yearsParam ?>&<?= $monthsParam ?>&ma_tinh_tp=<?= urlencode($filters['ma_tinh_tp']) ?>&ma_khach_hang=<?= urlencode($filters['ma_khach_hang']) ?>&gkhl_status=<?= urlencode($filters['gkhl_status']) ?>" 
+                           class="btn btn-success">
+                            <i class="fas fa-file-csv me-2"></i>Export CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <div class="row mb-4">
                 <div class="col-md-3">
                     <div class="stat-box">
@@ -185,17 +271,6 @@ renderNavbar($currentPage, $thangNam);
             <div class="data-card">
                 <h5 class="mb-4">
                     <i class="fas fa-users me-2"></i>Danh sách khách hàng (Top 100)
-                    <?php if (!empty($filters['gkhl_status'])): ?>
-                        <?php if ($filters['gkhl_status'] === '1'): ?>
-                            <span class="badge badge-gkhl ms-2">
-                                <i class="fas fa-check-circle"></i> Lọc: Đã tham gia GKHL
-                            </span>
-                        <?php elseif ($filters['gkhl_status'] === '0'): ?>
-                            <span class="badge badge-no-gkhl ms-2">
-                                <i class="fas fa-times-circle"></i> Lọc: Chưa tham gia GKHL
-                            </span>
-                        <?php endif; ?>
-                    <?php endif; ?>
                 </h5>
                 <div class="table-responsive">
                     <table id="customerTable" class="table table-hover table-sm">
@@ -217,12 +292,8 @@ renderNavbar($currentPage, $thangNam);
                                 <tr <?php if (!empty($row['has_gkhl'])): ?>style="background-color: rgba(40, 167, 69, 0.05);"<?php endif; ?>>
                                     <td class="text-center"><?= $index + 1 ?></td>
                                     <td><strong><?= htmlspecialchars($row['ma_khach_hang']) ?></strong></td>
-                                    <td title="<?= htmlspecialchars($row['ten_khach_hang']) ?>">
-                                        <?= htmlspecialchars($row['ten_khach_hang']) ?>
-                                    </td>
-                                    <td title="<?= htmlspecialchars($row['dia_chi_khach_hang']) ?>">
-                                        <?= htmlspecialchars($row['dia_chi_khach_hang']) ?>
-                                    </td>
+                                    <td><?= htmlspecialchars($row['ten_khach_hang']) ?></td>
+                                    <td><?= htmlspecialchars($row['dia_chi_khach_hang']) ?></td>
                                     <td><?= htmlspecialchars($row['ma_tinh_tp']) ?></td>
                                     <td class="text-end"><strong><?= number_format($row['total_doanh_so'], 0) ?></strong></td>
                                     <td class="text-end"><?= number_format($row['total_san_luong'], 0) ?></td>
@@ -238,7 +309,11 @@ renderNavbar($currentPage, $thangNam);
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
-                                        <a href="report.php?action=detail&ma_khach_hang=<?= urlencode($row['ma_khach_hang']) ?>&thang_nam=<?= urlencode($thangNam) ?>" 
+                                        <?php 
+                                        $yearsParam = http_build_query(['years' => $selectedYears]);
+                                        $monthsParam = http_build_query(['months' => $selectedMonths]);
+                                        ?>
+                                        <a href="report.php?action=detail&ma_khach_hang=<?= urlencode($row['ma_khach_hang']) ?>&<?= $yearsParam ?>&<?= $monthsParam ?>" 
                                            class="btn btn-detail btn-sm">
                                             <i class="fas fa-eye me-1"></i>Chi tiết
                                         </a>
@@ -249,13 +324,13 @@ renderNavbar($currentPage, $thangNam);
                     </table>
                 </div>
             </div>
-        <?php elseif (!empty($thangNam)): ?>
+        <?php elseif (!empty($selectedYears) && !empty($selectedMonths)): ?>
             <div class="alert alert-warning">
                 <i class="fas fa-info-circle me-2"></i>Không tìm thấy dữ liệu phù hợp với bộ lọc.
             </div>
         <?php else: ?>
             <div class="alert alert-info">
-                <i class="fas fa-info-circle me-2"></i>Vui lòng chọn tháng/năm để xem báo cáo.
+                <i class="fas fa-info-circle me-2"></i>Vui lòng chọn năm và tháng để xem báo cáo.
             </div>
         <?php endif; ?>
     </div>
@@ -264,8 +339,18 @@ renderNavbar($currentPage, $thangNam);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
+            // Initialize Select2
+            $('#yearSelect, #monthSelect').select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                placeholder: 'Chọn...',
+                allowClear: false
+            });
+
+            // DataTable
             $('#customerTable').DataTable({
                 language: {
                     url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/vi.json'
@@ -280,6 +365,37 @@ renderNavbar($currentPage, $thangNam);
                 scrollX: false
             });
         });
+
+        // Quick select functions for years
+        function selectAllYears() {
+            $('#yearSelect option').prop('selected', true);
+            $('#yearSelect').trigger('change');
+        }
+
+        function clearYears() {
+            $('#yearSelect').val(null).trigger('change');
+        }
+
+        // Quick select functions for months
+        function selectAllMonths() {
+            $('#monthSelect option').prop('selected', true);
+            $('#monthSelect').trigger('change');
+        }
+
+        function clearMonths() {
+            $('#monthSelect').val(null).trigger('change');
+        }
+
+        function selectQuarter(quarter) {
+            const quarters = {
+                1: [1, 2, 3],
+                2: [4, 5, 6],
+                3: [7, 8, 9],
+                4: [10, 11, 12]
+            };
+            
+            $('#monthSelect').val(quarters[quarter]).trigger('change');
+        }
     </script>
 </body>
 </html>

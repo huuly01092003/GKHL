@@ -1,5 +1,4 @@
 <?php
-// export.php
 session_start();
 require_once 'controllers/ExportController.php';
 
@@ -7,10 +6,10 @@ $controller = new ExportController();
 $action = $_GET['action'] ?? 'form';
 
 if ($action === 'download') {
-    // Export CSV
+    // Export CSV với multi-select support
     $controller->exportCSV();
 } else {
-    // Hiển thị form export
+    // Hiển thị form export (nếu cần)
     require_once 'views/export_form.php';
 }
 ?>

@@ -1,5 +1,4 @@
 <?php
-// controllers/ExportController.php
 require_once 'models/ExportModel.php';
 
 class ExportController {
@@ -10,45 +9,40 @@ class ExportController {
     }
 
     public function exportCSV() {
-        // Lấy các tham số lọc
-        $thangNam = $_GET['thang_nam'] ?? '';
-        $maTinh = $_GET['ma_tinh_tp'] ?? '';
-        $gkhlStatus = $_GET['gkhl_status'] ?? '';
+        // ✅ CẬP NHẬT: Lấy nhiều năm và nhiều tháng
+        $selectedYears = isset($_GET['years']) ? (array)$_GET['years'] : [];
+        $selectedMonths = isset($_GET['months']) ? (array)$_GET['months'] : [];
         
-        // Validate tháng/năm
-        if (empty($thangNam)) {
-            $_SESSION['error'] = 'Vui lòng chọn tháng/năm để export';
+        // Chuyển đổi sang array số nguyên
+        $selectedYears = array_map('intval', array_filter($selectedYears));
+        $selectedMonths = array_map('intval', array_filter($selectedMonths));
+        
+        // Validate
+        if (empty($selectedYears) || empty($selectedMonths)) {
+            $_SESSION['error'] = 'Vui lòng chọn năm và tháng để export';
             header('Location: report.php');
             exit;
         }
 
-        // Parse tháng/năm
-        $parts = explode('/', $thangNam);
-        if (count($parts) !== 2) {
-            $_SESSION['error'] = 'Định dạng tháng/năm không hợp lệ';
-            header('Location: report.php');
-            exit;
-        }
-        
-        $rptMonth = (int)$parts[0];
-        $rptYear = (int)$parts[1];
-
-        // Lấy dữ liệu
+        // Lấy filters khác
         $filters = [
-            'ma_tinh_tp' => $maTinh,
-            'gkhl_status' => $gkhlStatus
+            'ma_tinh_tp' => $_GET['ma_tinh_tp'] ?? '',
+            'ma_khach_hang' => $_GET['ma_khach_hang'] ?? '',
+            'gkhl_status' => $_GET['gkhl_status'] ?? ''
         ];
 
-        $data = $this->model->getExportData($rptMonth, $rptYear, $filters);
+        // Lấy dữ liệu
+        $data = $this->model->getExportData($selectedYears, $selectedMonths, $filters);
 
         if (empty($data)) {
             $_SESSION['error'] = 'Không có dữ liệu để export';
-            header('Location: report.php?thang_nam=' . urlencode($thangNam));
+            header('Location: report.php?years[]=' . implode('&years[]=', $selectedYears) . 
+                   '&months[]=' . implode('&months[]=', $selectedMonths));
             exit;
         }
 
         // Tạo tên file
-        $fileName = $this->generateFileName($rptMonth, $rptYear, $maTinh, $gkhlStatus);
+        $fileName = $this->generateFileName($selectedYears, $selectedMonths, $filters);
 
         // Set headers để download file
         header('Content-Type: text/csv; charset=utf-8');
@@ -79,8 +73,8 @@ class ExportController {
             'Mã NVBH',
             'Tên NVBH',
             'Location',
-            'Tháng báo cáo',
             'Năm báo cáo',
+            'Tháng báo cáo',
             'Tổng số đơn hàng',
             'Tổng sản lượng',
             'Tổng doanh số trước CK',
@@ -120,8 +114,8 @@ class ExportController {
                 $row['ma_nvbh'] ?? '',
                 $row['ten_nvbh'] ?? '',
                 $row['location'] ?? '',
-                $rptMonth,
-                $rptYear,
+                implode(', ', $selectedYears), // Năm
+                implode(', ', $selectedMonths), // Tháng
                 $row['so_don_hang'] ?? 0,
                 $row['total_san_luong'] ?? 0,
                 $row['total_doanh_so_truoc_ck'] ?? 0,
@@ -148,17 +142,37 @@ class ExportController {
         exit;
     }
 
-    private function generateFileName($month, $year, $province, $gkhlStatus) {
-        $fileName = "BaoCao_KhachHang_{$month}_{$year}";
+    private function generateFileName($years, $months, $filters) {
+        $fileName = "BaoCao_KhachHang";
         
-        if (!empty($province)) {
-            $fileName .= "_" . $this->slugify($province);
+        // Thêm năm
+        if (count($years) > 1) {
+            $fileName .= "_Nam" . min($years) . "-" . max($years);
+        } else {
+            $fileName .= "_Nam" . $years[0];
         }
         
-        if ($gkhlStatus === '1') {
-            $fileName .= "_CoGKHL";
-        } elseif ($gkhlStatus === '0') {
-            $fileName .= "_ChuaCoGKHL";
+        // Thêm tháng
+        if (count($months) == 12) {
+            $fileName .= "_TatCaThang";
+        } elseif (count($months) > 1) {
+            $fileName .= "_Thang" . min($months) . "-" . max($months);
+        } else {
+            $fileName .= "_Thang" . $months[0];
+        }
+        
+        // Thêm tỉnh
+        if (!empty($filters['ma_tinh_tp'])) {
+            $fileName .= "_" . $this->slugify($filters['ma_tinh_tp']);
+        }
+        
+        // Thêm GKHL status
+        if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== '') {
+            if ($filters['gkhl_status'] === '1') {
+                $fileName .= "_CoGKHL";
+            } elseif ($filters['gkhl_status'] === '0') {
+                $fileName .= "_ChuaCoGKHL";
+            }
         }
         
         $fileName .= "_" . date('YmdHis') . ".csv";

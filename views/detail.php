@@ -86,6 +86,14 @@
             margin-bottom: 20px;
             border-left: 4px solid #667eea;
         }
+        .period-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: inline-block;
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -94,7 +102,22 @@
             <span class="navbar-brand mb-0 h1">
                 <i class="fas fa-user me-2"></i>Chi tiết Khách hàng
             </span>
-            <a href="report.php?thang_nam=<?= urlencode($thangNam) ?>" class="btn btn-light">
+            <?php 
+            // ✅ Tạo URL quay lại với tham số đúng
+            $yearsParam = isset($selectedYears) ? http_build_query(['years' => $selectedYears]) : '';
+            $monthsParam = isset($selectedMonths) ? http_build_query(['months' => $selectedMonths]) : '';
+            $backUrl = "report.php?{$yearsParam}&{$monthsParam}";
+            if (!empty($_GET['ma_tinh_tp'])) {
+                $backUrl .= '&ma_tinh_tp=' . urlencode($_GET['ma_tinh_tp']);
+            }
+            if (!empty($_GET['ma_khach_hang'])) {
+                $backUrl .= '&ma_khach_hang=' . urlencode($_GET['ma_khach_hang']);
+            }
+            if (!empty($_GET['gkhl_status'])) {
+                $backUrl .= '&gkhl_status=' . urlencode($_GET['gkhl_status']);
+            }
+            ?>
+            <a href="<?= $backUrl ?>" class="btn btn-light">
                 <i class="fas fa-arrow-left me-2"></i>Quay lại
             </a>
         </div>
@@ -117,7 +140,7 @@
             }
 
             // Lấy thông tin DSKH
-            $dskhInfo = $data[0]; // Thông tin từ bảng DSKH
+            $dskhInfo = $data[0];
             ?>
 
             <div class="info-card">
@@ -134,7 +157,7 @@
                         </div>
                         <div class="mb-3">
                             <span class="info-label"><i class="fas fa-user me-2"></i>Tên KH:</span>
-                            <span class="info-value"><?= htmlspecialchars($dskhInfo['ten_khach_hang'] ?? 'N/A') ?></span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['TenKH'] ?? 'N/A') ?></span>
                         </div>
                         <div class="mb-3">
                             <span class="info-label"><i class="fas fa-tag me-2"></i>Loại KH:</span>
@@ -142,7 +165,7 @@
                         </div>
                         <div class="mb-3">
                             <span class="info-label"><i class="fas fa-map-marker-alt me-2"></i>Địa chỉ:</span>
-                            <span class="info-value"><?= htmlspecialchars($dskhInfo['dia_chi_khach_hang'] ?? 'N/A') ?></span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['DiaChi'] ?? 'N/A') ?></span>
                         </div>
                         <div class="mb-3">
                             <span class="info-label"><i class="fas fa-map-signs me-2"></i>Quận/Huyện:</span>
@@ -150,14 +173,14 @@
                         </div>
                         <div class="mb-3">
                             <span class="info-label"><i class="fas fa-city me-2"></i>Tỉnh/TP:</span>
-                            <span class="info-value"><?= htmlspecialchars($dskhInfo['ma_tinh_tp'] ?? 'N/A') ?></span>
+                            <span class="info-value"><?= htmlspecialchars($dskhInfo['Tinh'] ?? 'N/A') ?></span>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
                             <span class="info-label"><i class="fas fa-globe-asia me-2"></i>Khu vực (Area):</span>
                             <span class="badge bg-success" style="font-size: 0.9rem; padding: 6px 12px;">
-                                <?= htmlspecialchars($dskhInfo['khu_vuc'] ?? $dskhInfo['Area'] ?? 'Chưa có') ?>
+                                <?= htmlspecialchars($dskhInfo['Area'] ?? 'Chưa có') ?>
                             </span>
                         </div>
                         <div class="mb-3">
@@ -220,10 +243,13 @@
                     </div>
                 </div>
 
+                <!-- ✅ CẬP NHẬT: Hiển thị kỳ báo cáo từ $periodDisplay -->
+                <?php if (!empty($periodDisplay)): ?>
                 <div class="mb-3">
-                    <span class="info-label"><i class="fas fa-calendar-alt me-2"></i>Tháng/Năm báo cáo:</span>
-                    <span class="badge bg-primary" style="font-size: 1rem; padding: 8px 15px;"><?= htmlspecialchars($thangNam) ?></span>
+                    <span class="info-label"><i class="fas fa-calendar-alt me-2"></i>Kỳ báo cáo:</span>
+                    <span class="period-badge"><?= htmlspecialchars($periodDisplay) ?></span>
                 </div>
+                <?php endif; ?>
 
                 <!-- Tổng hợp doanh số -->
                 <div class="row mt-4">
@@ -288,7 +314,6 @@
                                 <div class="mt-3">
                                     <p class="mb-2"><strong>📌 Tên Quầy:</strong> <?= htmlspecialchars($gkhlInfo['TenQuay']) ?></p>
                                     
-                                    <!-- THÊM SỐ ĐIỆN THOẠI -->
                                     <?php if (!empty($gkhlInfo['SDTZalo'])): ?>
                                         <p class="mb-2">
                                             <strong>📱 SĐT Zalo:</strong> 
@@ -366,6 +391,8 @@
                                 <th>STT</th>
                                 <th>Số đơn</th>
                                 <th>Ngày đặt</th>
+                                <th>Tháng</th>
+                                <th>Năm</th>
                                 <th>Mã SP</th>
                                 <th>Loại bán</th>
                                 <th class="text-end">Số lượng</th>
@@ -380,6 +407,8 @@
                                     <td><?= $index + 1 ?></td>
                                     <td><strong><?= htmlspecialchars($row['OrderNumber']) ?></strong></td>
                                     <td><?= !empty($row['OrderDate']) ? date('d/m/Y', strtotime($row['OrderDate'])) : 'N/A' ?></td>
+                                    <td><span class="badge bg-info"><?= $row['RptMonth'] ?? 'N/A' ?></span></td>
+                                    <td><span class="badge bg-primary"><?= $row['RptYear'] ?? 'N/A' ?></span></td>
                                     <td><?= htmlspecialchars($row['ProductCode']) ?></td>
                                     <td><span class="badge bg-secondary"><?= htmlspecialchars($row['ProductSaleType'] ?? 'N/A') ?></span></td>
                                     <td class="text-end"><?= number_format($row['Qty'], 0) ?></td>
@@ -429,7 +458,7 @@
                 }).addTo(map);
                 
                 var marker = L.marker([<?= $lat ?>, <?= $lng ?>]).addTo(map);
-                marker.bindPopup('<b><?= htmlspecialchars($data[0]['ten_khach_hang'] ?? 'Khách hàng') ?></b><br><?= htmlspecialchars($data[0]['dia_chi_khach_hang'] ?? '') ?>').openPopup();
+                marker.bindPopup('<b><?= htmlspecialchars($data[0]['TenKH'] ?? 'Khách hàng') ?></b><br><?= htmlspecialchars($data[0]['DiaChi'] ?? '') ?>').openPopup();
                 
                 L.circle([<?= $lat ?>, <?= $lng ?>], {
                     color: '#667eea',

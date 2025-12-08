@@ -139,7 +139,8 @@ class OrderDetailModel {
     }
 
     // ✅ TỐI ƯU: Thay subquery EXISTS bằng LEFT JOIN + GROUP BY có điều kiện
-    public function getCustomerSummary($rptMonth, $rptYear, $filters = []) {
+    // ✅ CẬP NHẬT: Hỗ trợ filter theo nhiều năm và nhiều tháng
+    public function getCustomerSummary($years = [], $months = [], $filters = []) {
         $sql = "SELECT 
                     o.CustCode as ma_khach_hang,
                     d.TenKH as ten_khach_hang,
@@ -154,13 +155,31 @@ class OrderDetailModel {
                 FROM {$this->table} o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
                 LEFT JOIN gkhl g ON g.MaKHDMS = o.CustCode
-                WHERE o.RptMonth = :rpt_month 
-                AND o.RptYear = :rpt_year";
+                WHERE 1=1";
         
-        $params = [
-            ':rpt_month' => $rptMonth,
-            ':rpt_year' => $rptYear
-        ];
+        $params = [];
+        
+        // Filter theo năm (có thể nhiều năm)
+        if (!empty($years)) {
+            $placeholders = [];
+            foreach ($years as $idx => $year) {
+                $key = ":year_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $year;
+            }
+            $sql .= " AND o.RptYear IN (" . implode(',', $placeholders) . ")";
+        }
+        
+        // Filter theo tháng (có thể nhiều tháng)
+        if (!empty($months)) {
+            $placeholders = [];
+            foreach ($months as $idx => $month) {
+                $key = ":month_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $month;
+            }
+            $sql .= " AND o.RptMonth IN (" . implode(',', $placeholders) . ")";
+        }
         
         if (!empty($filters['ma_tinh_tp'])) {
             $sql .= " AND d.Tinh = :ma_tinh_tp";
@@ -172,7 +191,6 @@ class OrderDetailModel {
             $params[':ma_khach_hang'] = '%' . $filters['ma_khach_hang'] . '%';
         }
         
-        // ✅ TỐI ƯU: Filter trong WHERE thay vì HAVING
         if (isset($filters['gkhl_status']) && $filters['gkhl_status'] !== '') {
             if ($filters['gkhl_status'] == '1') {
                 $sql .= " AND g.MaKHDMS IS NOT NULL";
@@ -191,7 +209,7 @@ class OrderDetailModel {
     }
 
     // ✅ TỐI ƯU: Query summary đơn giản hơn
-    public function getSummaryStats($rptMonth, $rptYear, $filters = []) {
+    public function getSummaryStats($years = [], $months = [], $filters = []) {
         $sql = "SELECT 
                     COUNT(DISTINCT o.CustCode) as total_khach_hang,
                     COALESCE(SUM(o.TotalNetAmount), 0) as total_doanh_so,
@@ -200,13 +218,29 @@ class OrderDetailModel {
                 FROM {$this->table} o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
                 LEFT JOIN gkhl g ON g.MaKHDMS = o.CustCode
-                WHERE o.RptMonth = :rpt_month 
-                AND o.RptYear = :rpt_year";
+                WHERE 1=1";
         
-        $params = [
-            ':rpt_month' => $rptMonth,
-            ':rpt_year' => $rptYear
-        ];
+        $params = [];
+        
+        if (!empty($years)) {
+            $placeholders = [];
+            foreach ($years as $idx => $year) {
+                $key = ":year_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $year;
+            }
+            $sql .= " AND o.RptYear IN (" . implode(',', $placeholders) . ")";
+        }
+        
+        if (!empty($months)) {
+            $placeholders = [];
+            foreach ($months as $idx => $month) {
+                $key = ":month_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $month;
+            }
+            $sql .= " AND o.RptMonth IN (" . implode(',', $placeholders) . ")";
+        }
         
         if (!empty($filters['ma_tinh_tp'])) {
             $sql .= " AND d.Tinh = :ma_tinh_tp";
@@ -231,7 +265,7 @@ class OrderDetailModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    public function getCustomerDetail($custCode, $rptMonth, $rptYear) {
+    public function getCustomerDetail($custCode, $years = [], $months = []) {
         $sql = "SELECT 
                     o.*,
                     d.TenKH, d.DiaChi, d.Tinh, d.MaSoThue,
@@ -239,17 +273,34 @@ class OrderDetailModel {
                     d.QuanHuyen, d.MaNPP, d.MaNVBH, d.TenNVBH
                 FROM {$this->table} o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
-                WHERE o.CustCode = :cust_code 
-                AND o.RptMonth = :rpt_month
-                AND o.RptYear = :rpt_year
-                ORDER BY o.OrderDate DESC";
+                WHERE o.CustCode = :cust_code";
+        
+        $params = [':cust_code' => $custCode];
+        
+        if (!empty($years)) {
+            $placeholders = [];
+            foreach ($years as $idx => $year) {
+                $key = ":year_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $year;
+            }
+            $sql .= " AND o.RptYear IN (" . implode(',', $placeholders) . ")";
+        }
+        
+        if (!empty($months)) {
+            $placeholders = [];
+            foreach ($months as $idx => $month) {
+                $key = ":month_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $month;
+            }
+            $sql .= " AND o.RptMonth IN (" . implode(',', $placeholders) . ")";
+        }
+        
+        $sql .= " ORDER BY o.OrderDate DESC";
         
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute([
-            ':cust_code' => $custCode,
-            ':rpt_month' => $rptMonth,
-            ':rpt_year' => $rptYear
-        ]);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -356,6 +407,22 @@ class OrderDetailModel {
         }
         
         return null;
+    }
+
+     // ✅ MỚI: Lấy danh sách năm có sẵn
+    public function getAvailableYears() {
+        $sql = "SELECT DISTINCT RptYear 
+                FROM {$this->table}
+                WHERE RptYear IS NOT NULL
+                ORDER BY RptYear DESC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    // ✅ MỚI: Lấy danh sách tháng (1-12)
+    public function getAvailableMonths() {
+        return range(1, 12);
     }
 }
 ?>

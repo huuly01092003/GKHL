@@ -9,8 +9,13 @@ class ReportController {
     }
 
     public function index() {
-        // Lấy tháng/năm từ query string (format: "11/2025")
-        $thangNam = $_GET['thang_nam'] ?? '';
+        // ✅ CẬP NHẬT: Lấy năm và tháng từ query string (có thể nhiều giá trị)
+        $selectedYears = isset($_GET['years']) ? (array)$_GET['years'] : [];
+        $selectedMonths = isset($_GET['months']) ? (array)$_GET['months'] : [];
+        
+        // Chuyển đổi sang array số nguyên
+        $selectedYears = array_map('intval', array_filter($selectedYears));
+        $selectedMonths = array_map('intval', array_filter($selectedMonths));
         
         $filters = [
             'ma_tinh_tp' => $_GET['ma_tinh_tp'] ?? '',
@@ -27,48 +32,64 @@ class ReportController {
         ];
 
         $provinces = $this->model->getProvinces();
-        $monthYears = $this->model->getMonthYears();
+        $availableYears = $this->model->getAvailableYears();
+        $availableMonths = $this->model->getAvailableMonths();
 
-        // Nếu đã chọn tháng/năm
-        if (!empty($thangNam)) {
-            // Parse tháng/năm (format: "11/2025")
-            $parts = explode('/', $thangNam);
-            if (count($parts) === 2) {
-                $rptMonth = (int)$parts[0];
-                $rptYear = (int)$parts[1];
-                
-                $data = $this->model->getCustomerSummary($rptMonth, $rptYear, $filters);
-                $summary = $this->model->getSummaryStats($rptMonth, $rptYear, $filters);
-            }
+        // Nếu đã chọn năm và tháng
+        if (!empty($selectedYears) && !empty($selectedMonths)) {
+            $data = $this->model->getCustomerSummary($selectedYears, $selectedMonths, $filters);
+            $summary = $this->model->getSummaryStats($selectedYears, $selectedMonths, $filters);
         }
+
+        // Tạo chuỗi hiển thị cho breadcrumb
+        $periodDisplay = $this->generatePeriodDisplay($selectedYears, $selectedMonths);
 
         require_once 'views/report.php';
     }
 
     public function detail() {
         $maKhachHang = $_GET['ma_khach_hang'] ?? '';
-        $thangNam = $_GET['thang_nam'] ?? '';
+        $selectedYears = isset($_GET['years']) ? (array)$_GET['years'] : [];
+        $selectedMonths = isset($_GET['months']) ? (array)$_GET['months'] : [];
 
-        if (empty($maKhachHang) || empty($thangNam)) {
-            header('Location: report.php');
-            exit;
-        }
-
-        // Parse tháng/năm
-        $parts = explode('/', $thangNam);
-        if (count($parts) !== 2) {
+        if (empty($maKhachHang) || empty($selectedYears) || empty($selectedMonths)) {
             header('Location: report.php');
             exit;
         }
         
-        $rptMonth = (int)$parts[0];
-        $rptYear = (int)$parts[1];
+        // Chuyển đổi sang array số nguyên
+        $selectedYears = array_map('intval', array_filter($selectedYears));
+        $selectedMonths = array_map('intval', array_filter($selectedMonths));
 
-        $data = $this->model->getCustomerDetail($maKhachHang, $rptMonth, $rptYear);
+        $data = $this->model->getCustomerDetail($maKhachHang, $selectedYears, $selectedMonths);
         $location = $this->model->getCustomerLocation($maKhachHang);
         $gkhlInfo = $this->model->getGkhlInfo($maKhachHang);
         
+        // Tạo chuỗi hiển thị kỳ báo cáo
+        $periodDisplay = $this->generatePeriodDisplay($selectedYears, $selectedMonths);
+        
         require_once 'views/detail.php';
+    }
+
+    /**
+     * Tạo chuỗi hiển thị cho kỳ báo cáo
+     */
+    private function generatePeriodDisplay($years, $months) {
+        if (empty($years) || empty($months)) {
+            return '';
+        }
+
+        $yearStr = count($years) > 1 ? 'Năm ' . implode(', ', $years) : 'Năm ' . $years[0];
+        
+        if (count($months) == 12) {
+            $monthStr = 'Tất cả các tháng';
+        } elseif (count($months) > 1) {
+            $monthStr = 'Tháng ' . implode(', ', $months);
+        } else {
+            $monthStr = 'Tháng ' . $months[0];
+        }
+
+        return $monthStr . ' - ' . $yearStr;
     }
 }
 ?>

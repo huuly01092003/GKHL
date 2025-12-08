@@ -1,5 +1,4 @@
 <?php
-// models/ExportModel.php
 require_once 'config/database.php';
 
 class ExportModel {
@@ -11,10 +10,10 @@ class ExportModel {
     }
 
     /**
+     * ✅ CẬP NHẬT: Hỗ trợ nhiều năm và nhiều tháng
      * Lấy dữ liệu đầy đủ để export
-     * Mỗi khách hàng 1 dòng với tất cả thông tin tổng hợp
      */
-    public function getExportData($rptMonth, $rptYear, $filters = []) {
+    public function getExportData($years = [], $months = [], $filters = []) {
         $sql = "SELECT 
                     o.CustCode as ma_khach_hang,
                     d.TenKH as ten_khach_hang,
@@ -53,18 +52,42 @@ class ExportModel {
                 FROM orderdetail o
                 LEFT JOIN dskh d ON o.CustCode = d.MaKH
                 LEFT JOIN gkhl g ON g.MaKHDMS = o.CustCode
-                WHERE o.RptMonth = :rpt_month 
-                AND o.RptYear = :rpt_year";
+                WHERE 1=1";
         
-        $params = [
-            ':rpt_month' => $rptMonth,
-            ':rpt_year' => $rptYear
-        ];
+        $params = [];
+        
+        // ✅ Filter theo nhiều năm
+        if (!empty($years)) {
+            $placeholders = [];
+            foreach ($years as $idx => $year) {
+                $key = ":year_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $year;
+            }
+            $sql .= " AND o.RptYear IN (" . implode(',', $placeholders) . ")";
+        }
+        
+        // ✅ Filter theo nhiều tháng
+        if (!empty($months)) {
+            $placeholders = [];
+            foreach ($months as $idx => $month) {
+                $key = ":month_$idx";
+                $placeholders[] = $key;
+                $params[$key] = $month;
+            }
+            $sql .= " AND o.RptMonth IN (" . implode(',', $placeholders) . ")";
+        }
         
         // Lọc theo tỉnh
         if (!empty($filters['ma_tinh_tp'])) {
             $sql .= " AND d.Tinh = :ma_tinh_tp";
             $params[':ma_tinh_tp'] = $filters['ma_tinh_tp'];
+        }
+        
+        // Lọc theo mã KH
+        if (!empty($filters['ma_khach_hang'])) {
+            $sql .= " AND o.CustCode LIKE :ma_khach_hang";
+            $params[':ma_khach_hang'] = '%' . $filters['ma_khach_hang'] . '%';
         }
         
         // Lọc theo trạng thái GKHL
@@ -87,25 +110,28 @@ class ExportModel {
     }
 
     /**
-     * Lấy danh sách tháng/năm có dữ liệu (cho dropdown)
+     * Lấy danh sách năm có dữ liệu
      */
-    public function getAvailableMonthYears() {
-        $sql = "SELECT DISTINCT 
-                    CONCAT(RptMonth, '/', RptYear) as thang_nam,
-                    RptMonth,
-                    RptYear
+    public function getAvailableYears() {
+        $sql = "SELECT DISTINCT RptYear 
                 FROM orderdetail
-                WHERE RptMonth IS NOT NULL AND RptYear IS NOT NULL
-                ORDER BY RptYear DESC, RptMonth DESC
-                LIMIT 24";
+                WHERE RptYear IS NOT NULL
+                ORDER BY RptYear DESC";
         
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
     /**
-     * Lấy danh sách tỉnh (cho dropdown)
+     * Lấy danh sách tháng (1-12)
+     */
+    public function getAvailableMonths() {
+        return range(1, 12);
+    }
+
+    /**
+     * Lấy danh sách tỉnh
      */
     public function getProvinces() {
         $sql = "SELECT DISTINCT d.Tinh 
