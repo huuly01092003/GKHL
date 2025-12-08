@@ -40,7 +40,8 @@ class OrderDetailModel {
             
             $stmt = $this->conn->prepare($sql);
             if (!$stmt) {
-                return ['success' => false, 'error' => 'Lỗi prepare SQL: ' . $this->conn->error];
+                return ['success' => false, 'error' => 'Lỗi prepare SQL: ' . implode(' | ', $this->conn->errorInfo())];
+
             }
 
             while (($line = fgets($handle)) !== false) {
