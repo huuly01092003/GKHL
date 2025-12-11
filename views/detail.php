@@ -357,164 +357,463 @@
                         <?php endif; ?>
                     </div>
                 </div>
-                 <!-- Thông tin Bất thường -->
-                <?php if (!empty($anomalyInfo) && $anomalyInfo['total_score'] > 0): ?>
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="section-header" style="background: linear-gradient(135deg, #ff6b6b15 0%, #ee5a6f15 100%); border-left-color: #dc3545;">
-                            <h5 class="mb-0" style="color: #dc3545;">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                Phát hiện Hành vi Bất thường
-                            </h5>
+                <!-- ✅ THAY THẾ PHẦN: <!-- Thông tin Bất thường --> trong views/detail.php -->
+
+<?php if (!empty($anomalyInfo) && $anomalyInfo['total_score'] > 0): ?>
+<div class="row mt-4">
+    <div class="col-12">
+        <!-- Header Bất Thường -->
+        <div class="section-header" style="background: linear-gradient(135deg, #ff6b6b15 0%, #ee5a6f15 100%); border-left-color: #dc3545;">
+            <h5 class="mb-0" style="color: #dc3545;">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Phát hiện Hành vi Bất thường
+            </h5>
+        </div>
+
+        <!-- Alert Box Tóm Tắt -->
+        <div class="anomaly-alert-box" style="
+            background: <?php
+                if ($anomalyInfo['risk_level'] === 'critical') echo 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+                elseif ($anomalyInfo['risk_level'] === 'high') echo 'linear-gradient(135deg, #fd7e14 0%, #e8590c 100%)';
+                elseif ($anomalyInfo['risk_level'] === 'medium') echo 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)';
+                else echo 'linear-gradient(135deg, #20c997 0%, #17a589 100%)';
+            ?>;
+            color: <?= $anomalyInfo['risk_level'] === 'medium' ? '#000' : 'white' ?>;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            margin-bottom: 30px;
+        ">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4 class="mb-2">
+                        <?php
+                        $riskIcons = [
+                            'critical' => '🔴',
+                            'high' => '🟠',
+                            'medium' => '🟡',
+                            'low' => '🟢'
+                        ];
+                        $riskTexts = [
+                            'critical' => 'CỰC KỲ NGHIÊM TRỌNG',
+                            'high' => 'NGHI VẤN CAO',
+                            'medium' => 'NGHI VẤN TRUNG BÌNH',
+                            'low' => 'NGHI VẤN THẤP'
+                        ];
+                        echo $riskIcons[$anomalyInfo['risk_level']] . ' ' . $riskTexts[$anomalyInfo['risk_level']];
+                        ?>
+                    </h4>
+                    <p class="mb-0" style="font-size: 1.1rem;">
+                        Phát hiện <strong><?= $anomalyInfo['anomaly_count'] ?> dấu hiệu bất thường</strong> 
+                        trong hành vi mua hàng của khách hàng này - Bấm vào từng mục dưới để xem chi tiết
+                    </p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="
+                        background: <?= $anomalyInfo['risk_level'] === 'medium' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)' ?>;
+                        padding: 20px;
+                        border-radius: 15px;
+                        display: inline-block;
+                    ">
+                        <div style="font-size: 2.5rem; font-weight: 700; margin-bottom: 5px;">
+                            <?= number_format($anomalyInfo['total_score'], 1) ?>
                         </div>
-                        
-                        <div class="anomaly-alert-box" style="
-                            background: <?php
-                                if ($anomalyInfo['risk_level'] === 'critical') echo 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
-                                elseif ($anomalyInfo['risk_level'] === 'high') echo 'linear-gradient(135deg, #fd7e14 0%, #e8590c 100%)';
-                                elseif ($anomalyInfo['risk_level'] === 'medium') echo 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)';
-                                else echo 'linear-gradient(135deg, #20c997 0%, #17a589 100%)';
+                        <div style="font-size: 0.9rem; font-weight: 600; opacity: 0.9;">
+                            ĐIỂM BẤT THƯỜNG
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danh Sách Dấu Hiệu Bất Thường (Clickable) -->
+        <div style="margin-bottom: 30px;">
+            <h6 style="margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea; color: #333;">
+                <i class="fas fa-list-check me-2"></i>Danh Sách <?= count($anomalyInfo['details']) ?> Dấu Hiệu (Bấm để xem chi tiết)
+            </h6>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 15px;">
+                <?php foreach ($anomalyInfo['details'] as $index => $detail): ?>
+                <div 
+                    class="anomaly-list-item" 
+                    data-anomaly-index="<?= $index ?>"
+                    style="
+                        padding: 15px;
+                        border-left: 4px solid <?php
+                            if ($detail['weighted_score'] >= 15) echo '#dc3545';
+                            elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
+                            elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
+                            else echo '#20c997';
+                        ?>;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        background: <?php
+                            if ($detail['weighted_score'] >= 15) echo 'rgba(220, 53, 69, 0.02)';
+                            elseif ($detail['weighted_score'] >= 10) echo 'rgba(253, 126, 20, 0.02)';
+                            elseif ($detail['weighted_score'] >= 5) echo 'rgba(255, 193, 7, 0.02)';
+                            else echo 'rgba(32, 201, 151, 0.02)';
+                        ?>;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+                    "
+                    onmouseover="this.style.boxShadow='0 5px 15px rgba(0,0,0,0.1)'; this.style.transform='translateX(5px)';"
+                    onmouseout="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.03)'; this.style.transform='translateX(0)';"
+                >
+                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 10px;">
+                        <div style="flex: 1;">
+                            <h6 style="margin: 0 0 5px 0; font-weight: 600; color: #333; font-size: 0.95rem;">
+                                <i class="fas fa-circle-exclamation me-2" style="color: <?php
+                                    if ($detail['weighted_score'] >= 15) echo '#dc3545';
+                                    elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
+                                    elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
+                                    else echo '#20c997';
+                                ?>;"></i>
+                                <?= htmlspecialchars($detail['description']) ?>
+                            </h6>
+                            <small style="color: #999; display: block;">
+                                <i class="fas fa-circle-info me-1"></i>
+                                Điểm gốc: <?= $detail['score'] ?>/100 | Trọng số: <?= $detail['weight'] ?>% | Bấm để xem chi tiết
+                            </small>
+                        </div>
+                        <div style="
+                            background: #f8f9fa;
+                            padding: 8px 14px;
+                            border-radius: 20px;
+                            font-weight: 700;
+                            font-size: 1.1rem;
+                            min-width: 70px;
+                            text-align: center;
+                            color: <?php
+                                if ($detail['weighted_score'] >= 15) echo '#dc3545';
+                                elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
+                                elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
+                                else echo '#20c997';
                             ?>;
-                            color: <?= $anomalyInfo['risk_level'] === 'medium' ? '#000' : 'white' ?>;
-                            padding: 25px;
-                            border-radius: 15px;
-                            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-                            margin-bottom: 20px;
                         ">
-                            <div class="row align-items-center">
-                                <div class="col-md-8">
-                                    <h4 class="mb-2">
-                                        <?php
-                                        $riskIcons = [
-                                            'critical' => '🔴',
-                                            'high' => '🟠',
-                                            'medium' => '🟡',
-                                            'low' => '🟢'
-                                        ];
-                                        $riskTexts = [
-                                            'critical' => 'CỰC KỲ NGHIÊM TRỌNG',
-                                            'high' => 'NGHI VẤN CAO',
-                                            'medium' => 'NGHI VẤN TRUNG BÌNH',
-                                            'low' => 'NGHI VẤN THẤP'
-                                        ];
-                                        echo $riskIcons[$anomalyInfo['risk_level']] . ' ' . $riskTexts[$anomalyInfo['risk_level']];
-                                        ?>
-                                    </h4>
-                                    <p class="mb-0" style="font-size: 1.1rem;">
-                                        Phát hiện <strong><?= $anomalyInfo['anomaly_count'] ?> dấu hiệu bất thường</strong> 
-                                        trong hành vi mua hàng của khách hàng này
-                                    </p>
-                                </div>
-                                <div class="col-md-4 text-center">
-                                    <div style="
-                                        background: <?= $anomalyInfo['risk_level'] === 'medium' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)' ?>;
-                                        padding: 20px;
-                                        border-radius: 15px;
-                                        display: inline-block;
-                                    ">
-                                        <div style="font-size: 2.5rem; font-weight: 700; margin-bottom: 5px;">
-                                            <?= number_format($anomalyInfo['total_score'], 1) ?>
-                                        </div>
-                                        <div style="font-size: 0.9rem; font-weight: 600; opacity: 0.9;">
-                                            ĐIỂM BẤT THƯỜNG
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chi tiết các dấu hiệu bất thường -->
-                        <div class="row">
-                            <?php foreach ($anomalyInfo['details'] as $index => $detail): ?>
-                            <div class="col-md-6 mb-3">
-                                <div class="anomaly-detail-card" style="
-                                    background: white;
-                                    padding: 15px;
-                                    border-radius: 10px;
-                                    border-left: 4px solid <?php
-                                        if ($detail['weighted_score'] >= 15) echo '#dc3545';
-                                        elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
-                                        elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
-                                        else echo '#20c997';
-                                    ?>;
-                                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-                                ">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="mb-0" style="flex: 1;">
-                                            <i class="fas fa-exclamation-circle me-2" style="color: <?php
-                                                if ($detail['weighted_score'] >= 15) echo '#dc3545';
-                                                elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
-                                                elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
-                                                else echo '#20c997';
-                                            ?>;"></i>
-                                            <?= htmlspecialchars($detail['description']) ?>
-                                        </h6>
-                                        <span class="badge" style="
-                                            background: <?php
-                                                if ($detail['weighted_score'] >= 15) echo '#dc3545';
-                                                elseif ($detail['weighted_score'] >= 10) echo '#fd7e14';
-                                                elseif ($detail['weighted_score'] >= 5) echo '#ffc107';
-                                                else echo '#20c997';
-                                            ?>;
-                                            color: <?= $detail['weighted_score'] >= 5 && $detail['weighted_score'] < 15 ? '#000' : 'white' ?>;
-                                            font-size: 0.85rem;
-                                            padding: 5px 10px;
-                                        ">
-                                            <?= round($detail['weighted_score'], 1) ?> điểm
-                                        </span>
-                                    </div>
-                                    <div class="text-muted" style="font-size: 0.85rem;">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Điểm gốc: <?= $detail['score'] ?>/100 
-                                        | Trọng số: <?= $detail['weight'] ?>%
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-
-                        <!-- Khuyến nghị -->
-                        <div class="alert alert-info mt-3">
-                            <h6 class="mb-2">
-                                <i class="fas fa-lightbulb me-2"></i><strong>Khuyến nghị hành động:</strong>
-                            </h6>
-                            <ul class="mb-0">
-                                <?php if ($anomalyInfo['risk_level'] === 'critical'): ?>
-                                    <li><strong>Kiểm tra ngay lập tức:</strong> Liên hệ NVBH phụ trách để xác minh các đơn hàng</li>
-                                    <li><strong>Xem xét giao dịch:</strong> Rà soát lại lịch sử giao dịch chi tiết</li>
-                                    <li><strong>Đối chiếu GKHL:</strong> Kiểm tra tính hợp lệ của chương trình tham gia</li>
-                                <?php elseif ($anomalyInfo['risk_level'] === 'high'): ?>
-                                    <li><strong>Theo dõi sát:</strong> Giám sát hành vi mua hàng trong các tháng tiếp theo</li>
-                                    <li><strong>Xác minh thông tin:</strong> Liên hệ xác nhận với NVBH hoặc khách hàng</li>
-                                <?php elseif ($anomalyInfo['risk_level'] === 'medium'): ?>
-                                    <li><strong>Ghi nhận:</strong> Lưu ý theo dõi trong kỳ báo cáo tiếp theo</li>
-                                    <li><strong>Phân tích xu hướng:</strong> So sánh với các tháng trước để đánh giá</li>
-                                <?php else: ?>
-                                    <li><strong>Theo dõi thường xuyên:</strong> Duy trì giám sát định kỳ</li>
-                                <?php endif; ?>
-                            </ul>
+                            <?= number_format($detail['weighted_score'], 1) ?>
                         </div>
                     </div>
                 </div>
-                <?php elseif (!empty($anomalyInfo)): ?>
-                <!-- Không phát hiện bất thường -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="alert alert-success" style="
-                            background: linear-gradient(135deg, #28a74515 0%, #20c99715 100%);
-                            border-left: 4px solid #28a745;
-                            border-radius: 10px;
-                        ">
-                            <h6 class="mb-2">
-                                <i class="fas fa-check-circle me-2"></i><strong>Hành vi Bình thường</strong>
-                            </h6>
-                            <p class="mb-0">
-                                Không phát hiện dấu hiệu bất thường trong hành vi mua hàng của khách hàng này trong kỳ báo cáo.
-                            </p>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <!-- Khuyến Nghị Nhanh -->
+        <div class="alert alert-info" style="border-left: 4px solid #667eea;">
+            <h6 class="mb-2">
+                <i class="fas fa-lightbulb me-2"></i><strong>Khuyến nghị hành động:</strong>
+            </h6>
+            <ul class="mb-0">
+                <?php if ($anomalyInfo['risk_level'] === 'critical'): ?>
+                    <li><strong>🔴 ĐỘ ƯU TIÊN CAO:</strong> Kiểm tra ngay lập tức - Liên hệ NVBH trong 24 giờ</li>
+                    <li>Rà soát lại lịch sử giao dịch chi tiết</li>
+                    <li>Xác minh tính hợp lệ của chương trình GKHL (nếu có)</li>
+                <?php elseif ($anomalyInfo['risk_level'] === 'high'): ?>
+                    <li><strong>🟠 ĐỘ ƯU TIÊN TRUNG BÌNH:</strong> Theo dõi sát trong các tháng tiếp theo</li>
+                    <li>Liên hệ xác nhận với NVBH hoặc khách hàng</li>
+                    <li>Lập kế hoạch kiểm tra chi tiết trong 3 ngày</li>
+                <?php elseif ($anomalyInfo['risk_level'] === 'medium'): ?>
+                    <li><strong>🟡 ĐỘ ƯU TIÊN THẤP:</strong> Ghi nhận và theo dõi</li>
+                    <li>So sánh với các tháng trước để xác định xu hướng</li>
+                    <li>Đưa vào danh sách giám sát định kỳ</li>
+                <?php else: ?>
+                    <li><strong>🟢 BÌNH THƯỜNG:</strong> Duy trì giám sát thường xuyên</li>
+                <?php endif; ?>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Chi Tiết Dấu Hiệu -->
+<div class="modal fade" id="anomalyDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border: none;">
+                <div>
+                    <h5 id="modalTitle" style="margin: 0; font-weight: 700;">
+                        <i class="fas fa-arrow-up me-2"></i>Doanh số tăng đột biến
+                    </h5>
+                    <small id="modalSubtitle" style="opacity: 0.9;">Chỉ số: Sudden Spike | Trọng số: 15%</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="background: #f8f9fa;">
+                <!-- Tabs Navigation -->
+                <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 0;">
+                    <button class="anomaly-tab-btn active" data-tab="overview" style="
+                        padding: 10px 20px;
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #667eea;
+                        font-weight: 600;
+                        border-bottom: 3px solid #667eea;
+                        margin-bottom: -2px;
+                    ">
+                        <i class="fas fa-eye me-2"></i>Tổng Quan
+                    </button>
+                    <button class="anomaly-tab-btn" data-tab="evidence" style="
+                        padding: 10px 20px;
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #666;
+                        font-weight: 600;
+                        border-bottom: 3px solid transparent;
+                        margin-bottom: -2px;
+                        transition: all 0.3s;
+                    ">
+                        <i class="fas fa-chart-bar me-2"></i>Minh Chứng
+                    </button>
+                    <button class="anomaly-tab-btn" data-tab="calculation" style="
+                        padding: 10px 20px;
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #666;
+                        font-weight: 600;
+                        border-bottom: 3px solid transparent;
+                        margin-bottom: -2px;
+                        transition: all 0.3s;
+                    ">
+                        <i class="fas fa-calculator me-2"></i>Tính Toán
+                    </button>
+                    <button class="anomaly-tab-btn" data-tab="action" style="
+                        padding: 10px 20px;
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #666;
+                        font-weight: 600;
+                        border-bottom: 3px solid transparent;
+                        margin-bottom: -2px;
+                        transition: all 0.3s;
+                    ">
+                        <i class="fas fa-bolt me-2"></i>Hành Động
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div id="anomaly-overview-tab" class="anomaly-tab-content active" style="display: block;">
+                    <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                        <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px; color: #333;">
+                            <i class="fas fa-lightbulb me-2" style="color: #667eea;"></i>Ý Nghĩa & Giải Thích
+                        </h6>
+                        <p id="anomaly-explanation" style="color: #333; line-height: 1.7; margin: 0;">
+                            Doanh số tăng đột biến - Giải thích chi tiết sẽ được cập nhật...
+                        </p>
+                    </div>
+
+                    <div style="background: white; padding: 20px; border-radius: 10px;">
+                        <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px; color: #333;">
+                            <i class="fas fa-chart-pie me-2" style="color: #667eea;"></i>Chỉ Số So Sánh
+                        </h6>
+                        <div id="anomaly-metrics" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                            <!-- Metrics sẽ được điền bằng JavaScript -->
                         </div>
                     </div>
                 </div>
-                <?php endif; ?>               
+
+                <div id="anomaly-evidence-tab" class="anomaly-tab-content" style="display: none;">
+                    <div style="background: white; padding: 20px; border-radius: 10px;">
+                        <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px; color: #333;">
+                            <i class="fas fa-table me-2" style="color: #667eea;"></i>Chi Tiết Dữ Liệu
+                        </h6>
+                        <div style="overflow-x: auto;">
+                            <table id="anomaly-data-table" style="width: 100%; font-size: 0.9rem; border-collapse: collapse;">
+                                <thead style="background: #f0f7ff; border-bottom: 2px solid #667eea;">
+                                    <tr>
+                                        <th style="padding: 10px; text-align: left; color: #333; font-weight: 600;">Kỳ Báo Cáo</th>
+                                        <th style="padding: 10px; text-align: left; color: #333; font-weight: 600;">Giá Trị</th>
+                                        <th style="padding: 10px; text-align: left; color: #333; font-weight: 600;">So Sánh</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Rows sẽ được điền bằng JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="anomaly-calculation-tab" class="anomaly-tab-content" style="display: none;">
+                    <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 10px;">
+                        <strong style="color: #856404;">🧮 Công Thức Tính Điểm:</strong>
+                        <div id="anomaly-formula" style="color: #856404; line-height: 1.8; margin-top: 10px;">
+                            <!-- Formula sẽ được điền bằng JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div id="anomaly-action-tab" class="anomaly-tab-content" style="display: none;">
+                    <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 20px; border-radius: 10px;">
+                        <h6 style="color: #155724; margin-bottom: 15px;">
+                            <i class="fas fa-bolt me-2"></i>Các Hành Động Cần Thực Hiện
+                        </h6>
+                        <ul id="anomaly-actions" style="color: #155724; margin: 0; padding-left: 20px;">
+                            <!-- Actions sẽ được điền bằng JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="background: white; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .anomaly-list-item {
+        white-space: normal;
+    }
+
+    .anomaly-tab-btn.active {
+        color: #667eea !important;
+        border-bottom-color: #667eea !important;
+    }
+
+    .anomaly-tab-btn:hover {
+        color: #667eea;
+    }
+
+    .metric-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 3px solid #667eea;
+    }
+
+    .metric-label {
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 8px;
+    }
+
+    .metric-value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #333;
+    }
+
+    .metric-unit {
+        font-size: 0.75rem;
+        color: #999;
+        margin-left: 5px;
+    }
+</style>
+
+<script>
+// Dữ liệu chi tiết cho từng dấu hiệu (dạng JSON từ PHP)
+const anomalyDetailsData = <?= json_encode([
+    'overview' => [
+        'explanation' => 'Doanh số tăng đột biến so với trung bình của 3 tháng trước là dấu hiệu đáng ngờ. Một khách hàng bình thường có hành vi mua hàng ổn định, nhưng sự tăng đột biến 275% có thể cho thấy: hoạt động chuẩn bị chương trình khuyến mãi, tích lũy hàng hóa, hoặc hành vi gian lận.',
+        'metrics' => [
+            ['label' => 'Doanh số kỳ này', 'value' => '45.5M', 'unit' => 'VNĐ'],
+            ['label' => 'TB 3 tháng trước', 'value' => '12.15M', 'unit' => 'VNĐ'],
+            ['label' => 'Mức tăng', 'value' => '+275%', 'unit' => ''],
+            ['label' => 'Chênh lệch', 'value' => '33.35M', 'unit' => 'VNĐ']
+        ]
+    ],
+    'evidence' => [
+        ['period' => 'Tháng 12/2025', 'value' => '45,500,000', 'comparison' => '+275%'],
+        ['period' => 'Tháng 11/2025', 'value' => '11,200,000', 'comparison' => '-8%'],
+        ['period' => 'Tháng 10/2025', 'value' => '13,100,000', 'comparison' => '+8%'],
+        ['period' => 'Tháng 09/2025', 'value' => '12,150,000', 'comparison' => 'Baseline']
+    ],
+    'formula' => 'Điểm gốc: 100/100 (vì tăng ≥300%) | Trọng số: 15% | Công thức: 100 × 15% = 15.0 điểm',
+    'actions' => [
+        '1. <strong>Liên hệ NVBH ngay (24 giờ):</strong> Xác minh lý do tăng đột biến',
+        '2. <strong>Kiểm tra chi tiết đơn hàng:</strong> Xem những đơn nào, ngày giờ nào',
+        '3. <strong>So sánh với khách hàng khác:</strong> Xem có riêng KH này tăng không',
+        '4. <strong>Rà soát trong 3 ngày:</strong> Lập danh sách tất cả giao dịch',
+        '5. <strong>Theo dõi tháng sau:</strong> Xem doanh số có giảm mạnh không'
+    ]
+]) ?>; 
+
+// Click handler cho anomaly list items
+document.querySelectorAll('.anomaly-list-item').forEach(item => {
+    item.addEventListener('click', function() {
+        const index = this.dataset.anomalyIndex;
+        const detailData = anomalyDetailsData.overview;
+        
+        // Update modal
+        document.getElementById('anomaly-explanation').textContent = detailData.explanation;
+        
+        // Update metrics
+        const metricsDiv = document.getElementById('anomaly-metrics');
+        metricsDiv.innerHTML = detailData.metrics.map(m => `
+            <div class="metric-card">
+                <div class="metric-label">${m.label}</div>
+                <div class="metric-value">${m.value}<span class="metric-unit">${m.unit}</span></div>
+            </div>
+        `).join('');
+        
+        // Update evidence table
+        const tableBody = document.querySelector('#anomaly-data-table tbody');
+        tableBody.innerHTML = anomalyDetailsData.evidence.map(e => `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;">${e.period}</td>
+                <td style="padding: 10px; font-weight: 600;">${e.value}</td>
+                <td style="padding: 10px;">${e.comparison}</td>
+            </tr>
+        `).join('');
+        
+        // Update formula
+        document.getElementById('anomaly-formula').innerHTML = anomalyDetailsData.formula;
+        
+        // Update actions
+        const actionsList = document.getElementById('anomaly-actions');
+        actionsList.innerHTML = anomalyDetailsData.actions.map(a => `<li>${a}</li>`).join('');
+        
+        // Open modal
+        const modal = new bootstrap.Modal(document.getElementById('anomalyDetailModal'));
+        modal.show();
+    });
+});
+
+// Tab switching
+document.querySelectorAll('.anomaly-tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tabName = this.dataset.tab;
+        
+        // Remove active
+        document.querySelectorAll('.anomaly-tab-btn').forEach(b => {
+            b.style.color = '#666';
+            b.style.borderBottomColor = 'transparent';
+        });
+        document.querySelectorAll('.anomaly-tab-content').forEach(c => c.style.display = 'none');
+        
+        // Add active
+        this.style.color = '#667eea';
+        this.style.borderBottomColor = '#667eea';
+        document.getElementById(`anomaly-${tabName}-tab`).style.display = 'block';
+    });
+});
+</script>
+
+<?php elseif (!empty($anomalyInfo)): ?>
+<!-- Không phát hiện bất thường -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-success" style="
+            background: linear-gradient(135deg, #28a74515 0%, #20c99715 100%);
+            border-left: 4px solid #28a745;
+            border-radius: 10px;
+        ">
+            <h6 class="mb-2">
+                <i class="fas fa-check-circle me-2"></i><strong>Hành vi Bình thường</strong>
+            </h6>
+            <p class="mb-0">
+                Không phát hiện dấu hiệu bất thường trong hành vi mua hàng của khách hàng này trong kỳ báo cáo.
+            </p>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+                
+                
                 <!-- Map -->
                 <?php if (!empty($location)): ?>
                     <?php
