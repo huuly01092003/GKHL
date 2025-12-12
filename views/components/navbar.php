@@ -41,6 +41,19 @@ function renderNavbar($currentPage = '', $thangNam = '') {
                         <i class="fas fa-handshake me-1"></i>GKHL
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $currentPage === 'nhanvien_report' ? 'active' : '' ?>" 
+                    href="nhanvien_report.php">
+                        <i class="fas fa-user-tie me-1"></i>DS Nhân viên
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $currentPage === 'nhanvien_kpi' ? 'active' : '' ?>" 
+                    href="nhanvien_kpi.php">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <span style="color: #fff3cd;">KPI NV</span>
+                    </a>
+                </li>
             </ul>
             
             <?php if ($currentPage === 'report' && !empty($thangNam)): ?>
