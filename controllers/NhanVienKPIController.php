@@ -1,8 +1,8 @@
 <?php
 /**
- * ✅ CONTROLLER: KPI PHÁT HIỆN BẤT THƯỜNG NHÂN VIÊN
- * Tích hợp từ KPIReportController.php
- * Điều chỉnh cho database GKHL
+ * ✅ CONTROLLER: KPI PHÁT HIỆN BẤT THƯỜNG NHÂN VIÊN (FIXED)
+ * - Thêm biến $has_filtered
+ * - Chỉ tính toán KPI khi user đã submit form
  */
 
 require_once 'models/NhanVienKPIModel.php';
@@ -22,6 +22,7 @@ class NhanVienKPIController {
         $filters = [];
         $available_months = [];
         $available_products = [];
+        $has_filtered = false; // ✅ Khởi tạo biến
         
         try {
             // ✅ Lấy danh sách tháng
@@ -36,12 +37,45 @@ class NhanVienKPIController {
             
             $available_products = $this->model->getAvailableProducts();
             
-            // ✅ Lấy filters
+            // ✅ Kiểm tra xem user đã submit form chưa
+            $has_filtered = !empty($_GET['tu_ngay']) && !empty($_GET['den_ngay']);
+            
+            if (!$has_filtered) {
+                // Chỉ set giá trị mặc định cho form, KHÔNG tính toán
+                $filters = [
+                    'thang' => $available_months[0] ?? '',
+                    'tu_ngay' => !empty($available_months[0]) ? $available_months[0] . '-01' : '',
+                    'den_ngay' => !empty($available_months[0]) ? date('Y-m-t', strtotime($available_months[0] . '-01')) : '',
+                    'product_filter' => ''
+                ];
+                
+                // Khởi tạo statistics rỗng
+                $statistics = [
+                    'total_employees' => 0,
+                    'employees_with_orders' => 0,
+                    'total_orders' => 0,
+                    'total_amount' => 0,
+                    'avg_orders_per_emp' => 0,
+                    'avg_daily_orders' => 0,
+                    'avg_daily_amount' => 0,
+                    'max_daily_orders' => 0,
+                    'max_daily_amount' => 0,
+                    'std_dev_orders' => 0,
+                    'warning_count' => 0,
+                    'danger_count' => 0,
+                    'normal_count' => 0
+                ];
+                
+                require_once 'views/nhanvien_kpi/report.php';
+                return;
+            }
+            
+            // ✅ User đã submit form → Bắt đầu tính toán
             $thang = !empty($_GET['thang']) ? $_GET['thang'] : $available_months[0];
             if (!in_array($thang, $available_months)) $thang = $available_months[0];
             
-            $tu_ngay = !empty($_GET['tu_ngay']) ? $_GET['tu_ngay'] : $thang . '-01';
-            $den_ngay = !empty($_GET['den_ngay']) ? $_GET['den_ngay'] : date('Y-m-t', strtotime($thang . '-01'));
+            $tu_ngay = trim($_GET['tu_ngay']);
+            $den_ngay = trim($_GET['den_ngay']);
             
             if (strtotime($tu_ngay) > strtotime($den_ngay)) {
                 list($tu_ngay, $den_ngay) = [$den_ngay, $tu_ngay];
@@ -149,7 +183,11 @@ class NhanVienKPIController {
             if (empty($kpi_data)) {
                 $message = "⚠️ Không có dữ liệu cho khoảng thời gian này.";
                 $type = 'warning';
+            } else {
+                $message = "✅ Đã phân tích " . count($kpi_data) . " nhân viên thành công!";
+                $type = 'success';
             }
+            
         } catch (Exception $e) {
             $message = "❌ Lỗi: " . $e->getMessage();
             $type = 'danger';

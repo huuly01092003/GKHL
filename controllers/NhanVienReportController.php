@@ -1,10 +1,5 @@
 <?php
-/**
- * ✅ CONTROLLER: BÁO CÁO DOANH SỐ NHÂN VIÊN
- * Tích hợp từ ReportController.php cũ
- * Điều chỉnh cho database GKHL
- * ⭐ Chỉ load dữ liệu khi user filter
- */
+
 
 require_once 'models/NhanVienReportModel.php';
 

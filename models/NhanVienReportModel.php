@@ -1,7 +1,6 @@
 <?php
 /**
- * ✅ MODEL: BÁO CÁO DOANH SỐ NHÂN VIÊN
- * Điều chỉnh từ OrderModel.php cũ để phù hợp database GKHL
+ * ✅ MODEL: BÁO CÁO DOANH SỐ NHÂN VIÊN - Fixed cho DSVGKHL
  */
 
 require_once 'config/database.php';
@@ -15,7 +14,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Lấy danh sách tháng có sẵn
+     * Lấy danh sách tháng có sẵn
      */
     public function getAvailableMonths() {
         try {
@@ -36,7 +35,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Tổng doanh số theo tháng (RptYear-RptMonth)
+     * Tổng doanh số theo tháng (RptYear-RptMonth)
      */
     public function getTotalByMonth($thang) {
         try {
@@ -56,7 +55,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Tổng doanh số theo khoảng ngày (OrderDate)
+     * Tổng doanh số theo khoảng ngày (OrderDate)
      */
     public function getTotalByDateRange($tu_ngay, $den_ngay) {
         try {
@@ -74,7 +73,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Doanh số nhân viên theo tháng
+     * Doanh số nhân viên theo tháng
      */
     public function getEmployeeTotalByMonth($dsr_code, $thang) {
         try {
@@ -94,7 +93,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Doanh số nhân viên theo khoảng ngày
+     * Doanh số nhân viên theo khoảng ngày
      */
     public function getEmployeeTotalByDateRange($dsr_code, $tu_ngay, $den_ngay) {
         try {
@@ -113,7 +112,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Số ngày có doanh số
+     * Số ngày có doanh số
      */
     public function getEmployeeDaysWithOrders($dsr_code, $tu_ngay, $den_ngay) {
         try {
@@ -132,7 +131,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Doanh số ngày cao nhất (khoảng)
+     * Doanh số ngày cao nhất (khoảng)
      */
     public function getMaxDailyAmountByDateRange($dsr_code, $tu_ngay, $den_ngay) {
         try {
@@ -155,7 +154,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Doanh số ngày cao nhất (tháng)
+     * Doanh số ngày cao nhất (tháng)
      */
     public function getMaxDailyAmountByMonth($dsr_code, $thang) {
         try {
@@ -179,7 +178,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Số nhân viên trong khoảng
+     * Số nhân viên trong khoảng
      */
     public function getEmployeeCountInRange($tu_ngay, $den_ngay) {
         try {
@@ -198,7 +197,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Số nhân viên trong tháng
+     * Số nhân viên trong tháng
      */
     public function getEmployeeCountInMonth($thang) {
         try {
@@ -219,7 +218,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Trung bình doanh số/ngày/nhân viên (khoảng)
+     * Trung bình doanh số/ngày/nhân viên (khoảng)
      */
     public function getSystemRangeAveragePerDay($tu_ngay, $den_ngay) {
         try {
@@ -240,7 +239,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Trung bình doanh số/ngày/nhân viên (tháng)
+     * Trung bình doanh số/ngày/nhân viên (tháng)
      */
     public function getSystemMonthlyAveragePerDay($thang) {
         try {
@@ -260,7 +259,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ TB doanh số ngày cao nhất/nhân viên (khoảng)
+     * TB doanh số ngày cao nhất/nhân viên (khoảng)
      */
     public function getSystemMaxDailyAveragePerEmployee($tu_ngay, $den_ngay) {
         try {
@@ -292,7 +291,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ TB doanh số ngày cao nhất/nhân viên (tháng)
+     * TB doanh số ngày cao nhất/nhân viên (tháng)
      */
     public function getSystemMaxDailyAveragePerEmployeeByMonth($thang) {
         try {
@@ -326,7 +325,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ Lấy danh sách nhân viên (DSRCode duy nhất)
+     * Lấy danh sách nhân viên (DSRCode duy nhất)
      */
     public function getAllEmployees() {
         try {

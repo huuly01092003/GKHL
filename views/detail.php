@@ -953,41 +953,37 @@ document.querySelectorAll('.anomaly-tab-btn').forEach(btn => {
     </script>
 
     <script>
-// ✅ DỮ LIỆU CHI TIẾT CHO TỪNG DẤU HIỆU - LẤY TỪ PHP
-const anomalyDetailsConfig = {
+/**
+ * ✅ JAVASCRIPT HIỂN THỊ MODAL CHI TIẾT - SỬ DỤNG DỮ LIỆU THẬT TỪ PHP
+ * Thêm vào cuối file detail.php trước </body>
+ */
+
+// ============================================
+// CONFIG CHO TỪNG LOẠI BẤT THƯỜNG
+// ============================================
+const anomalyConfig = {
     'sudden_spike': {
         icon: '📈',
         title: 'Doanh Số Tăng Đột Biến',
         color: '#dc3545',
         getExplanation: (m) => {
             const increase = m.increase_percent || 0;
-            return `Khách hàng tăng doanh số ${increase}% so với trung bình ${m.historical_months || 3} tháng trước. ` +
+            const months = m.historical_months || 3;
+            return `Khách hàng tăng doanh số ${increase}% so với trung bình ${months} tháng trước. ` +
                    `Đây là dấu hiệu điển hình của việc tích lũy hàng hóa trước khi chốt chương trình, hoặc hành vi gian lận.`;
         },
-        getMetrics: (m) => [
-            {label: 'Doanh số kỳ này', value: formatMoney(m.current_sales), unit: 'VNĐ'},
-            {label: 'TB 3-6 tháng trước', value: formatMoney(m.historical_avg), unit: 'VNĐ'},
-            {label: 'Mức tăng', value: '+' + (m.increase_percent || 0) + '%', unit: '', highlight: true},
-            {label: 'Chênh lệch', value: formatMoney(m.difference || 0), unit: 'VNĐ'}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức tính điểm gốc:</strong><br>
-            - Tăng ≥500%: 100 điểm<br>
-            - Tăng ≥400%: 90 điểm<br>
-            - Tăng ≥300%: 80 điểm<br>
-            - Tăng ≥200%: 65 điểm<br>
-            - Tăng ≥150%: 50 điểm<br><br>
-            <strong>Trường hợp này:</strong> Tăng ${m.increase_percent}% → Điểm gốc: ${m.score || 0}/100<br>
-            <strong>Trọng số:</strong> 20%<br>
-            <strong>Điểm cuối:</strong> ${m.score || 0} × 20% = ${((m.score || 0) * 0.2).toFixed(1)} điểm
-        `,
-        getActions: () => [
-            '<strong>1. Liên hệ NVBH ngay (trong 24 giờ):</strong> Xác minh lý do tăng đột biến',
-            '<strong>2. Kiểm tra chi tiết đơn hàng:</strong> Xem những đơn nào, ngày nào, sản phẩm gì',
-            '<strong>3. So sánh với khách hàng khác:</strong> Xem có chỉ KH này tăng hay nhiều KH cùng tăng',
-            '<strong>4. Rà soát trong 3 ngày:</strong> Lập danh sách tất cả giao dịch bất thường',
-            '<strong>5. Theo dõi 2-3 tháng tiếp theo:</strong> Xem doanh số có giảm mạnh/ngừng mua không'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map(row => `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;">${row.comparison}</td>
+                </tr>
+            `).join('');
+        }
     },
     
     'return_after_long_break': {
@@ -1000,26 +996,18 @@ const anomalyDetailsConfig = {
             return `Khách hàng nghỉ mua hàng ${gap} tháng sau đó đột ngột quay lại và mua với số lượng lớn (${increase}% so với lần trước). ` +
                    `Hành vi này rất bất thường và thường liên quan đến gian lận chương trình khuyến mãi.`;
         },
-        getMetrics: (m) => [
-            {label: 'Thời gian nghỉ', value: m.months_gap || 0, unit: 'tháng'},
-            {label: 'Doanh số quay lại', value: formatMoney(m.current_sales), unit: 'VNĐ'},
-            {label: 'Doanh số trước đó', value: formatMoney(m.last_sales), unit: 'VNĐ'},
-            {label: 'Mức tăng', value: '+' + (m.increase_percent || 0) + '%', unit: '', highlight: true}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức:</strong><br>
-            - Nghỉ ≥6 tháng + Tăng ≥200%: 100 điểm<br>
-            - Nghỉ ≥4 tháng + Tăng ≥150%: 80 điểm<br>
-            - Nghỉ ≥3 tháng + Tăng ≥100%: 60 điểm<br><br>
-            <strong>Trường hợp này:</strong> Nghỉ ${m.months_gap} tháng, Tăng ${m.increase_percent}%<br>
-            <strong>Trọng số:</strong> 18%
-        `,
-        getActions: () => [
-            '<strong>1. Xác minh ngay lập tức:</strong> Tại sao khách hàng quay lại sau thời gian dài?',
-            '<strong>2. Kiểm tra lịch sử:</strong> Có mua hàng từ nguồn khác không?',
-            '<strong>3. Thẩm định đơn hàng:</strong> Kiểm tra tính hợp lệ của các đơn',
-            '<strong>4. Theo dõi liên tục:</strong> Xem có tiếp tục mua hay dừng sau 1-2 tháng'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu lịch sử</td></tr>';
+            }
+            return evidence.map(row => `
+                <tr style="border-bottom: 1px solid #eee; ${row.orders == 0 ? 'background: #fff3cd;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;">${row.orders} đơn ${row.orders == 0 ? '⚠️ NGHỈ' : ''}</td>
+                </tr>
+            `).join('');
+        }
     },
     
     'checkpoint_rush': {
@@ -1033,29 +1021,20 @@ const anomalyDetailsConfig = {
             return `Khách hàng tập trung ${ratio}% đơn hàng vào 2 thời điểm: giữa tháng (12-14): ${mid} đơn và cuối tháng (26-28): ${end} đơn. ` +
                    `Đây là thời điểm chốt số KPI của nhiều chương trình, rất dễ gian lận.`;
         },
-        getMetrics: (m) => [
-            {label: 'Đơn tại checkpoint', value: m.checkpoint_orders || 0, unit: 'đơn'},
-            {label: 'Tổng đơn', value: m.total_orders || 0, unit: 'đơn'},
-            {label: 'Tỷ lệ đơn', value: (m.checkpoint_ratio || 0) + '%', unit: '', highlight: true},
-            {label: 'DS tại checkpoint', value: formatMoney(m.checkpoint_amount), unit: 'VNĐ'},
-            {label: 'Tổng doanh số', value: formatMoney(m.total_amount), unit: 'VNĐ'},
-            {label: 'Tỷ lệ DS', value: (m.amount_ratio || 0) + '%', unit: '', highlight: true}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức:</strong><br>
-            - Checkpoint ≥80% đơn và DS: 100 điểm<br>
-            - Checkpoint ≥70%: 85 điểm<br>
-            - Checkpoint ≥60%: 70 điểm<br>
-            - Checkpoint ≥50%: 55 điểm<br><br>
-            <strong>Trường hợp này:</strong> ${m.checkpoint_ratio}% đơn, ${m.amount_ratio}% DS<br>
-            <strong>Trọng số:</strong> 16%
-        `,
-        getActions: () => [
-            '<strong>1. Rà soát ngay:</strong> Tại sao lại tập trung vào 2 thời điểm này?',
-            '<strong>2. Kiểm tra đối chiếu:</strong> So sánh với các KH khác trong khu vực',
-            '<strong>3. Xác minh giao hàng:</strong> Đơn có thực sự được giao không?',
-            '<strong>4. Cảnh báo NVBH:</strong> Nhắc nhở về quy trình kiểm soát'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map(row => {
+                const isCheckpoint = row.comparison.includes('Giữa tháng') || row.comparison.includes('Cuối tháng');
+                return `
+                <tr style="border-bottom: 1px solid #eee; ${isCheckpoint ? 'background: #fff3cd;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;">${row.comparison} ${isCheckpoint ? '⚠️' : ''}</td>
+                </tr>
+            `}).join('');
+        }
     },
     
     'product_concentration': {
@@ -1065,31 +1044,22 @@ const anomalyDetailsConfig = {
         getExplanation: (m) => {
             const types = m.distinct_types || 0;
             const concentration = m.concentration_percent || 0;
-            return `Khách hàng chỉ mua ${types} loại sản phẩm với tỷ lệ tập trung ${concentration}%. ` +
+            const topType = m.top_product_type || 'N/A';
+            return `Khách hàng chỉ mua ${types} loại sản phẩm (${topType}) với tỷ lệ tập trung ${concentration}%. ` +
                    `Khách hàng thực thường mua đa dạng, việc tập trung vào 1 sản phẩm có thể là tích lũy để đạt KPI.`;
         },
-        getMetrics: (m) => [
-            {label: 'Số loại SP', value: m.distinct_types || 0, unit: 'loại'},
-            {label: 'Loại chính', value: m.top_product_type || 'N/A', unit: ''},
-            {label: 'SL loại chính', value: (m.top_product_qty || 0).toLocaleString(), unit: 'đơn vị'},
-            {label: 'Tổng SL', value: (m.total_qty || 0).toLocaleString(), unit: 'đơn vị'},
-            {label: 'Tỷ lệ tập trung', value: (m.concentration_percent || 0) + '%', unit: '', highlight: true}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức:</strong><br>
-            - 1 loại + Tập trung ≥95%: 100 điểm<br>
-            - 1 loại + Tập trung ≥90%: 85 điểm<br>
-            - 1 loại + Tập trung ≥80%: 70 điểm<br>
-            - 2 loại + Tập trung ≥85%: 60 điểm<br><br>
-            <strong>Trường hợp này:</strong> ${m.distinct_types} loại, Tập trung ${m.concentration_percent}%<br>
-            <strong>Trọng số:</strong> 14%
-        `,
-        getActions: () => [
-            '<strong>1. Xác minh nhu cầu:</strong> Tại sao chỉ mua 1 loại?',
-            '<strong>2. Kiểm tra kho:</strong> Sản phẩm có tồn kho lâu không?',
-            '<strong>3. So sánh lịch sử:</strong> Trước đây KH có mua đa dạng không?',
-            '<strong>4. Rà soát chương trình KM:</strong> Có đang chạy KM cho SP này không?'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map((row, idx) => `
+                <tr style="border-bottom: 1px solid #eee; ${idx === 0 ? 'background: #fff3cd;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;">${row.comparison} ${idx === 0 ? '⚠️ CHỦ LỰC' : ''}</td>
+                </tr>
+            `).join('');
+        }
     },
     
     'unusual_product_pattern': {
@@ -1103,27 +1073,35 @@ const anomalyDetailsConfig = {
             return `Khách hàng đột ngột mua ${newProducts} loại sản phẩm mới (${newRatio}%) khác lạ so với thói quen: ${types}. ` +
                    `Hành vi thay đổi đột ngột thường liên quan đến gian lận hoặc thay đổi người mua.`;
         },
-        getMetrics: (m) => [
-            {label: 'Sản phẩm mới', value: m.new_products || 0, unit: 'loại'},
-            {label: 'Tổng loại SP', value: m.total_products || 0, unit: 'loại'},
-            {label: 'Tỷ lệ SP mới', value: (m.new_ratio || 0) + '%', unit: '', highlight: true},
-            {label: 'DS từ SP mới', value: formatMoney(m.new_sales), unit: 'VNĐ'},
-            {label: 'Tỷ lệ DS mới', value: (m.new_sales_ratio || 0) + '%', unit: '', highlight: true}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức:</strong><br>
-            - SP mới ≥80% + DS mới ≥70%: 100 điểm<br>
-            - SP mới ≥60% + DS mới ≥50%: 80 điểm<br>
-            - SP mới ≥40% hoặc DS mới ≥40%: 60 điểm<br><br>
-            <strong>Trường hợp này:</strong> ${m.new_ratio}% SP mới, ${m.new_sales_ratio}% DS mới<br>
-            <strong>Trọng số:</strong> 12%
-        `,
-        getActions: () => [
-            '<strong>1. Xác minh:</strong> Có thay đổi người quản lý/chủ cửa hàng không?',
-            '<strong>2. Kiểm tra:</strong> Sản phẩm mới có phù hợp với ngành hàng không?',
-            '<strong>3. So sánh:</strong> Các KH khác có mua SP này không?',
-            '<strong>4. Theo dõi:</strong> Tháng sau có tiếp tục mua SP mới không?'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || !evidence.usual_products || !evidence.new_products) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu so sánh</td></tr>';
+            }
+            
+            let html = '<tr><td colspan="3" style="background: #e7f3ff; padding: 10px; font-weight: 600;">📌 Sản phẩm thường mua (12 tháng trước)</td></tr>';
+            evidence.usual_products.forEach(row => {
+                html += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px;">Loại SP: ${row.product_type}</td>
+                        <td style="padding: 10px;">${row.frequency} lần</td>
+                        <td style="padding: 10px;">${formatMoney(row.total_amount)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '<tr><td colspan="3" style="background: #fff3cd; padding: 10px; font-weight: 600;">⚠️ Sản phẩm mới (kỳ này)</td></tr>';
+            evidence.new_products.forEach(row => {
+                html += `
+                    <tr style="border-bottom: 1px solid #eee; background: #fffbf0;">
+                        <td style="padding: 10px;">${row.period}</td>
+                        <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                        <td style="padding: 10px;">${row.comparison}</td>
+                    </tr>
+                `;
+            });
+            
+            return html;
+        }
     },
     
     'burst_orders': {
@@ -1137,28 +1115,20 @@ const anomalyDetailsConfig = {
             return `Khách hàng đặt ${maxOrders} đơn trong 1 ngày (${maxDate}) và mua liên tục ${consecutive} ngày. ` +
                    `Hành vi bình thường là rải đều trong tháng, việc dồn dập là dấu hiệu gian lận rõ ràng.`;
         },
-        getMetrics: (m) => [
-            {label: 'Đơn/ngày cao nhất', value: m.max_orders_in_day || 0, unit: 'đơn'},
-            {label: 'Ngày', value: m.max_order_date || 'N/A', unit: ''},
-            {label: 'Liên tục', value: m.max_consecutive_days || 0, unit: 'ngày'},
-            {label: 'Tổng ngày mua', value: m.total_days || 0, unit: 'ngày'},
-            {label: 'TB đơn/ngày', value: (m.avg_orders_per_day || 0).toFixed(1), unit: 'đơn'}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức:</strong><br>
-            - ≥10 đơn/ngày + Liên tục 3 ngày: 100 điểm<br>
-            - ≥8 đơn/ngày + Liên tục 2 ngày: 85 điểm<br>
-            - ≥6 đơn/ngày: 70 điểm<br>
-            - ≥5 đơn/ngày và >3x TB: 60 điểm<br><br>
-            <strong>Trường hợp này:</strong> ${m.max_orders_in_day} đơn/ngày, Liên tục ${m.max_consecutive_days} ngày<br>
-            <strong>Trọng số:</strong> 15%
-        `,
-        getActions: () => [
-            '<strong>1. Kiểm tra GẤP:</strong> Tại sao lại đặt nhiều đơn cùng lúc?',
-            '<strong>2. Xác minh giao hàng:</strong> Tất cả đơn có được giao thực tế không?',
-            '<strong>3. Rà soát hệ thống:</strong> Có phải lỗi hệ thống tạo đơn trùng không?',
-            '<strong>4. Cảnh báo nghiêm trọng:</strong> Đưa vào danh sách theo dõi đặc biệt'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map((row, idx) => {
+                const isHighVolume = parseInt(row.comparison) >= 5;
+                return `
+                <tr style="border-bottom: 1px solid #eee; ${isHighVolume ? 'background: #fff3cd;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;">${row.comparison} ${isHighVolume ? '⚠️ DỒN DẬP' : ''}</td>
+                </tr>
+            `}).join('');
+        }
     },
     
     'high_value_outlier': {
@@ -1168,32 +1138,22 @@ const anomalyDetailsConfig = {
         getExplanation: (m) => {
             const sigma = m.sigma_count || 0;
             const max = formatMoney(m.max_order_value);
-            return `Có đơn hàng với giá trị ${max} cao hơn ${sigma.toFixed(2)} lần độ lệch chuẩn so với trung bình của khách hàng. ` +
+            const threshold = formatMoney(m.threshold_3sigma);
+            return `Có đơn hàng với giá trị ${max} cao hơn ${sigma.toFixed(2)} lần độ lệch chuẩn so với trung bình (ngưỡng 3σ: ${threshold}). ` +
                    `Đây là outlier thống kê, cần kiểm tra kỹ.`;
         },
-        getMetrics: (m) => [
-            {label: 'Giá trị đơn cao nhất', value: formatMoney(m.max_order_value), unit: 'VNĐ'},
-            {label: 'Giá trị TB', value: formatMoney(m.avg_order_value), unit: 'VNĐ'},
-            {label: 'Độ lệch chuẩn (σ)', value: formatMoney(m.stddev), unit: 'VNĐ'},
-            {label: 'Số sigma', value: (m.sigma_count || 0).toFixed(2) + 'σ', unit: '', highlight: true},
-            {label: 'Ngưỡng 3σ', value: formatMoney(m.threshold_3sigma), unit: 'VNĐ'}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức:</strong><br>
-            Số σ = (Giá trị max - Trung bình) / Độ lệch chuẩn<br><br>
-            - ≥5σ: 100 điểm<br>
-            - ≥4σ: 85 điểm<br>
-            - ≥3σ: 70 điểm<br>
-            - ≥2.5σ: 50 điểm<br><br>
-            <strong>Trường hợp này:</strong> ${(m.sigma_count || 0).toFixed(2)}σ<br>
-            <strong>Trọng số:</strong> 13%
-        `,
-        getActions: () => [
-            '<strong>1. Xác minh đơn hàng:</strong> Kiểm tra chi tiết sản phẩm và số lượng',
-            '<strong>2. Đối chiếu:</strong> So với các đơn khác của KH',
-            '<strong>3. Xác nhận thanh toán:</strong> Đã thanh toán đầy đủ chưa?',
-            '<strong>4. Kiểm tra giao hàng:</strong> Đơn có thực sự được giao không?'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map((row, idx) => `
+                <tr style="border-bottom: 1px solid #eee; ${idx === 0 ? 'background: #fff3cd;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;">${row.comparison} ${idx === 0 ? '⚠️ CAO NHẤT' : ''}</td>
+                </tr>
+            `).join('');
+        }
     },
     
     'no_purchase_after_spike': {
@@ -1206,61 +1166,294 @@ const anomalyDetailsConfig = {
             return `Sau khi mua nhiều đột biến, khách hàng ${hasActivity ? 'giảm ' + drop + '%' : 'ngừng mua hoàn toàn'} trong 1-2 tháng tiếp theo. ` +
                    `Đây là dấu hiệu rõ ràng của việc "đẩy" doanh số để đạt KPI.`;
         },
-        getMetrics: (m) => [
-            {label: 'DS kỳ spike', value: formatMoney(m.spike_sales), unit: 'VNĐ'},
-            {label: 'DS sau đó', value: formatMoney(m.after_sales), unit: 'VNĐ'},
-            {label: 'Đơn sau đó', value: m.after_orders || 0, unit: 'đơn'},
-            {label: 'Mức giảm', value: '-' + (m.drop_percent || 0) + '%', unit: '', highlight: true}
-        ],
-        getFormula: (m) => `
-            <strong>Công thức:</strong><br>
-            - Không mua gì sau spike: 100 điểm<br>
-            - Giảm ≥90%: 85 điểm<br>
-            - Giảm ≥80%: 70 điểm<br>
-            - Giảm ≥70%: 55 điểm<br><br>
-            <strong>Lưu ý:</strong> Chỉ áp dụng nếu có spike (≥50 điểm)<br>
-            <strong>Trọng số:</strong> 10%
-        `,
-        getActions: () => [
-            '<strong>1. Kết luận gian lận:</strong> Khả năng cao là đẩy DS giả',
-            '<strong>2. Rà soát toàn bộ:</strong> Kiểm tra lại tất cả đơn hàng trong kỳ spike',
-            '<strong>3. Liên hệ ngay:</strong> Yêu cầu NVBH giải trình',
-            '<strong>4. Xử lý:</strong> Cân nhắc các biện pháp xử lý theo quy định'
-        ]
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map(row => {
+                const isSpike = row.period.includes('Spike');
+                const isAfter = row.period.includes('Sau spike');
+                const noActivity = row.comparison.includes('Không có');
+                return `
+                <tr style="border-bottom: 1px solid #eee; ${isSpike ? 'background: #fff3cd;' : ''} ${noActivity ? 'background: #f8d7da;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;">${row.comparison} ${noActivity ? '⚠️ NGỪNG' : ''}</td>
+                </tr>
+            `}).join('');
+        }
     }
 };
 
-// Helper functions
+// ============================================
+// HÀM HELPER
+// ============================================
 function formatMoney(value) {
     if (!value || value === 0) return '0';
     return parseFloat(value).toLocaleString('vi-VN');
 }
 
-// ✅ XỬ LÝ KHI CLICK VÀO DẤU HIỆU - SỬ DỤNG DỮ LIỆU THẬT
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.anomaly-list-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const jsonData = this.dataset.anomalyJson;
-            if (!jsonData) return;
-            
-            try {
-                const data = JSON.parse(jsonData);
-                showAnomalyDetail(data);
-            } catch(e) {
-                console.error('Parse error:', e);
-            }
-        });
-    });
-});
+function getMetricCards(type, metrics) {
+    switch(type) {
+        case 'sudden_spike':
+            return [
+                {label: 'Doanh số kỳ này', value: formatMoney(metrics.current_sales), unit: 'VNĐ'},
+                {label: 'TB 3-6 tháng trước', value: formatMoney(metrics.historical_avg), unit: 'VNĐ'},
+                {label: 'Mức tăng', value: '+' + (metrics.increase_percent || 0) + '%', unit: '', highlight: true},
+                {label: 'Chênh lệch', value: formatMoney(metrics.difference || 0), unit: 'VNĐ'}
+            ];
+        
+        case 'return_after_long_break':
+            return [
+                {label: 'Thời gian nghỉ', value: metrics.months_gap || 0, unit: 'tháng'},
+                {label: 'Doanh số quay lại', value: formatMoney(metrics.current_sales), unit: 'VNĐ'},
+                {label: 'Doanh số trước đó', value: formatMoney(metrics.last_sales), unit: 'VNĐ'},
+                {label: 'Mức tăng', value: '+' + (metrics.increase_percent || 0) + '%', unit: '', highlight: true}
+            ];
+        
+        case 'checkpoint_rush':
+            return [
+                {label: 'Đơn tại checkpoint', value: metrics.checkpoint_orders || 0, unit: 'đơn'},
+                {label: 'Tổng đơn', value: metrics.total_orders || 0, unit: 'đơn'},
+                {label: 'Tỷ lệ đơn', value: (metrics.checkpoint_ratio || 0) + '%', unit: '', highlight: true},
+                {label: 'DS tại checkpoint', value: formatMoney(metrics.checkpoint_amount), unit: 'VNĐ'},
+                {label: 'Tổng doanh số', value: formatMoney(metrics.total_amount), unit: 'VNĐ'},
+                {label: 'Tỷ lệ DS', value: (metrics.amount_ratio || 0) + '%', unit: '', highlight: true}
+            ];
+        
+        case 'product_concentration':
+            return [
+                {label: 'Số loại SP', value: metrics.distinct_types || 0, unit: 'loại'},
+                {label: 'Loại chính', value: metrics.top_product_type || 'N/A', unit: ''},
+                {label: 'SL loại chính', value: (metrics.top_product_qty || 0).toLocaleString(), unit: 'đơn vị'},
+                {label: 'Tổng SL', value: (metrics.total_qty || 0).toLocaleString(), unit: 'đơn vị'},
+                {label: 'Tỷ lệ tập trung', value: (metrics.concentration_percent || 0) + '%', unit: '', highlight: true}
+            ];
+        
+        case 'unusual_product_pattern':
+            return [
+                {label: 'Sản phẩm mới', value: metrics.new_products || 0, unit: 'loại'},
+                {label: 'Tổng loại SP', value: metrics.total_products || 0, unit: 'loại'},
+                {label: 'Tỷ lệ SP mới', value: (metrics.new_ratio || 0) + '%', unit: '', highlight: true},
+                {label: 'DS từ SP mới', value: formatMoney(metrics.new_sales), unit: 'VNĐ'},
+                {label: 'Tỷ lệ DS mới', value: (metrics.new_sales_ratio || 0) + '%', unit: '', highlight: true}
+            ];
+        
+        case 'burst_orders':
+            return [
+                {label: 'Đơn/ngày cao nhất', value: metrics.max_orders_in_day || 0, unit: 'đơn'},
+                {label: 'Ngày', value: metrics.max_order_date || 'N/A', unit: ''},
+                {label: 'Liên tục', value: metrics.max_consecutive_days || 0, unit: 'ngày'},
+                {label: 'Tổng ngày mua', value: metrics.total_days || 0, unit: 'ngày'},
+                {label: 'TB đơn/ngày', value: (metrics.avg_orders_per_day || 0).toFixed(1), unit: 'đơn'}
+            ];
+        
+        case 'high_value_outlier':
+            return [
+                {label: 'Giá trị đơn cao nhất', value: formatMoney(metrics.max_order_value), unit: 'VNĐ'},
+                {label: 'Giá trị TB', value: formatMoney(metrics.avg_order_value), unit: 'VNĐ'},
+                {label: 'Độ lệch chuẩn (σ)', value: formatMoney(metrics.stddev), unit: 'VNĐ'},
+                {label: 'Số sigma', value: (metrics.sigma_count || 0).toFixed(2) + 'σ', unit: '', highlight: true},
+                {label: 'Ngưỡng 3σ', value: formatMoney(metrics.threshold_3sigma), unit: 'VNĐ'}
+            ];
+        
+        case 'no_purchase_after_spike':
+            return [
+                {label: 'DS kỳ spike', value: formatMoney(metrics.spike_sales), unit: 'VNĐ'},
+                {label: 'DS sau đó', value: formatMoney(metrics.after_sales), unit: 'VNĐ'},
+                {label: 'Đơn sau đó', value: metrics.after_orders || 0, unit: 'đơn'},
+                {label: 'Mức giảm', value: '-' + (metrics.drop_percent || 0) + '%', unit: '', highlight: true}
+            ];
+        
+        default:
+            return [];
+    }
+}
 
-function showAnomalyDetail(data) {
-    const config = anomalyDetailsConfig[data.type];
-    if (!config) return;
-    
-    const modal = document.getElementById('anomalyDetailModal');
-    if (!modal) return;
+function getFormula(type, metrics) {
+    switch(type) {
+        case 'sudden_spike':
+            return `
+                <strong>Công thức tính điểm gốc:</strong><br>
+                - Tăng ≥500%: 100 điểm<br>
+                - Tăng ≥400%: 90 điểm<br>
+                - Tăng ≥300%: 80 điểm<br>
+                - Tăng ≥200%: 65 điểm<br>
+                - Tăng ≥150%: 50 điểm<br><br>
+                <strong>Trường hợp này:</strong> Tăng ${metrics.increase_percent}% → Điểm gốc: ${metrics.score || 0}/100<br>
+                <strong>Trọng số:</strong> 20%<br>
+                <strong>Điểm cuối:</strong> ${metrics.score || 0} × 20% = ${((metrics.score || 0) * 0.2).toFixed(1)} điểm
+            `;
+        
+        case 'return_after_long_break':
+            return `
+                <strong>Công thức:</strong><br>
+                - Nghỉ ≥6 tháng + Tăng ≥200%: 100 điểm<br>
+                - Nghỉ ≥4 tháng + Tăng ≥150%: 80 điểm<br>
+                - Nghỉ ≥3 tháng + Tăng ≥100%: 60 điểm<br><br>
+                <strong>Trường hợp này:</strong> Nghỉ ${metrics.months_gap} tháng, Tăng ${metrics.increase_percent}%<br>
+                <strong>Trọng số:</strong> 18%
+            `;
+        
+        case 'checkpoint_rush':
+            return `
+                <strong>Công thức:</strong><br>
+                - Checkpoint ≥80% đơn và DS: 100 điểm<br>
+                - Checkpoint ≥70%: 85 điểm<br>
+                - Checkpoint ≥60%: 70 điểm<br>
+                - Checkpoint ≥50%: 55 điểm<br><br>
+                <strong>Trường hợp này:</strong> ${metrics.checkpoint_ratio}% đơn, ${metrics.amount_ratio}% DS<br>
+                <strong>Trọng số:</strong> 16%
+            `;
+        
+        case 'product_concentration':
+            return `
+                <strong>Công thức:</strong><br>
+                - 1 loại + Tập trung ≥95%: 100 điểm<br>
+                - 1 loại + Tập trung ≥90%: 85 điểm<br>
+                - 1 loại + Tập trung ≥80%: 70 điểm<br>
+                - 2 loại + Tập trung ≥85%: 60 điểm<br><br>
+                <strong>Trường hợp này:</strong> ${metrics.distinct_types} loại, Tập trung ${metrics.concentration_percent}%<br>
+                <strong>Trọng số:</strong> 14%
+            `;
+        
+        case 'unusual_product_pattern':
+            return `
+                <strong>Công thức:</strong><br>
+                - SP mới ≥80% + DS mới ≥70%: 100 điểm<br>
+                - SP mới ≥60% + DS mới ≥50%: 80 điểm<br>
+                - SP mới ≥40% hoặc DS mới ≥40%: 60 điểm<br><br>
+                <strong>Trường hợp này:</strong> ${metrics.new_ratio}% SP mới, ${metrics.new_sales_ratio}% DS mới<br>
+                <strong>Trọng số:</strong> 12%
+            `;
+        
+        case 'burst_orders':
+            return `
+                <strong>Công thức:</strong><br>
+                - ≥10 đơn/ngày + Liên tục 3 ngày: 100 điểm<br>
+                - ≥8 đơn/ngày + Liên tục 2 ngày: 85 điểm<br>
+                - ≥6 đơn/ngày: 70 điểm<br>
+                - ≥5 đơn/ngày và >3x TB: 60 điểm<br><br>
+                <strong>Trường hợp này:</strong> ${metrics.max_orders_in_day} đơn/ngày, Liên tục ${metrics.max_consecutive_days} ngày<br>
+                <strong>Trọng số:</strong> 15%
+            `;
+        
+        case 'high_value_outlier':
+            return `
+                <strong>Công thức:</strong><br>
+                Số σ = (Giá trị max - Trung bình) / Độ lệch chuẩn<br><br>
+                - ≥5σ: 100 điểm<br>
+                - ≥4σ: 85 điểm<br>
+                - ≥3σ: 70 điểm<br>
+                - ≥2.5σ: 50 điểm<br><br>
+                <strong>Trường hợp này:</strong> ${(metrics.sigma_count || 0).toFixed(2)}σ<br>
+                <strong>Trọng số:</strong> 13%
+            `;
+        
+        case 'no_purchase_after_spike':
+            return `
+                <strong>Công thức:</strong><br>
+                - Không mua gì sau spike: 100 điểm<br>
+                - Giảm ≥90%: 85 điểm<br>
+                - Giảm ≥80%: 70 điểm<br>
+                - Giảm ≥70%: 55 điểm<br><br>
+                <strong>Lưu ý:</strong> Chỉ áp dụng nếu có spike (≥50 điểm)<br>
+                <strong>Trọng số:</strong> 10%
+            `;
+        
+        default:
+            return 'Công thức chưa được định nghĩa';
+    }
+}
+
+function getActions(type) {
+    switch(type) {
+        case 'sudden_spike':
+            return [
+                '<strong>1. Liên hệ NVBH ngay (trong 24 giờ):</strong> Xác minh lý do tăng đột biến',
+                '<strong>2. Kiểm tra chi tiết đơn hàng:</strong> Xem những đơn nào, ngày nào, sản phẩm gì',
+                '<strong>3. So sánh với khách hàng khác:</strong> Xem có chỉ KH này tăng hay nhiều KH cùng tăng',
+                '<strong>4. Rà soát trong 3 ngày:</strong> Lập danh sách tất cả giao dịch bất thường',
+                '<strong>5. Theo dõi 2-3 tháng tiếp theo:</strong> Xem doanh số có giảm mạnh/ngừng mua không'
+            ];
+        
+        case 'return_after_long_break':
+            return [
+                '<strong>1. Xác minh ngay lập tức:</strong> Tại sao khách hàng quay lại sau thời gian dài?',
+                '<strong>2. Kiểm tra lịch sử:</strong> Có mua hàng từ nguồn khác không?',
+                '<strong>3. Thẩm định đơn hàng:</strong> Kiểm tra tính hợp lệ của các đơn',
+                '<strong>4. Theo dõi liên tục:</strong> Xem có tiếp tục mua hay dừng sau 1-2 tháng'
+            ];
+        
+        case 'checkpoint_rush':
+            return [
+                '<strong>1. Rà soát ngay:</strong> Tại sao lại tập trung vào 2 thời điểm này?',
+                '<strong>2. Kiểm tra đối chiếu:</strong> So sánh với các KH khác trong khu vực',
+                '<strong>3. Xác minh giao hàng:</strong> Đơn có thực sự được giao không?',
+                '<strong>4. Cảnh báo NVBH:</strong> Nhắc nhở về quy trình kiểm soát'
+            ];
+        
+        case 'product_concentration':
+            return [
+                '<strong>1. Xác minh nhu cầu:</strong> Tại sao chỉ mua 1 loại?',
+                '<strong>2. Kiểm tra kho:</strong> Sản phẩm có tồn kho lâu không?',
+                '<strong>3. So sánh lịch sử:</strong> Trước đây KH có mua đa dạng không?',
+                '<strong>4. Rà soát chương trình KM:</strong> Có đang chạy KM cho SP này không?'
+            ];
+        
+        case 'unusual_product_pattern':
+            return [
+                '<strong>1. Xác minh:</strong> Có thay đổi người quản lý/chủ cửa hàng không?',
+                '<strong>2. Kiểm tra:</strong> Sản phẩm mới có phù hợp với ngành hàng không?',
+                '<strong>3. So sánh:</strong> Các KH khác có mua SP này không?',
+                '<strong>4. Theo dõi:</strong> Tháng sau có tiếp tục mua SP mới không?'
+            ];
+        
+        case 'burst_orders':
+            return [
+                '<strong>1. Kiểm tra GẤP:</strong> Tại sao lại đặt nhiều đơn cùng lúc?',
+                '<strong>2. Xác minh giao hàng:</strong> Tất cả đơn có được giao thực tế không?',
+                '<strong>3. Rà soát hệ thống:</strong> Có phải lỗi hệ thống tạo đơn trùng không?',
+                '<strong>4. Cảnh báo nghiêm trọng:</strong> Đưa vào danh sách theo dõi đặc biệt'
+            ];
+        
+        case 'high_value_outlier':
+            return [
+                '<strong>1. Xác minh đơn hàng:</strong> Kiểm tra chi tiết sản phẩm và số lượng',
+                '<strong>2. Đối chiếu:</strong> So với các đơn khác của KH',
+                '<strong>3. Xác nhận thanh toán:</strong> Đã thanh toán đầy đủ chưa?',
+                '<strong>4. Kiểm tra giao hàng:</strong> Đơn có thực sự được giao không?'
+            ];
+        
+        case 'no_purchase_after_spike':
+            return [
+                '<strong>1. Kết luận gian lận:</strong> Khả năng cao là đẩy DS giả',
+                '<strong>2. Rà soát toàn bộ:</strong> Kiểm tra lại tất cả đơn hàng trong kỳ spike',
+                '<strong>3. Liên hệ ngay:</strong> Yêu cầu NVBH giải trình',
+                '<strong>4. Xử lý:</strong> Cân nhắc các biện pháp xử lý theo quy định'
+            ];
+        
+        default:
+            return ['Chưa có khuyến nghị cụ thể'];
+    }
+}
+
+// ============================================
+// HÀM HIỂN THỊ MODAL
+// ============================================
+function showAnomalyDetailModal(data) {
+    const config = anomalyConfig[data.type];
+    if (!config) {
+        console.error('Không tìm thấy config cho type:', data.type);
+        return;
+    }
     
     const metrics = data.metrics || {};
+    const modal = document.getElementById('anomalyDetailModal');
+    if (!modal) {
+        console.error('Không tìm thấy modal');
+        return;
+    }
     
     // Update header
     document.getElementById('modalTitle').innerHTML = `${config.icon} ${config.title}`;
@@ -1269,11 +1462,11 @@ function showAnomalyDetail(data) {
     modal.querySelector('.modal-header').style.background = 
         `linear-gradient(135deg, ${config.color} 0%, ${adjustColor(config.color, -20)} 100%)`;
     
-    // Update overview tab
+    // Tab 1: TỔNG QUAN
     document.getElementById('anomaly-explanation').textContent = config.getExplanation(metrics);
     
-    const metricsArray = config.getMetrics(metrics);
-    document.getElementById('anomaly-metrics').innerHTML = metricsArray.map(m => `
+    const metricCards = getMetricCards(data.type, metrics);
+    document.getElementById('anomaly-metrics').innerHTML = metricCards.map(m => `
         <div class="metric-card" style="${m.highlight ? 'border-left-color: ' + config.color + ';' : ''}">
             <div class="metric-label">${m.label}</div>
             <div class="metric-value" style="${m.highlight ? 'color: ' + config.color + ';' : ''}">
@@ -1282,19 +1475,67 @@ function showAnomalyDetail(data) {
         </div>
     `).join('');
     
-    // Update calculation tab
-    const formulaData = Object.assign({}, metrics, {score: data.score});
-    document.getElementById('anomaly-formula').innerHTML = config.getFormula(formulaData);
+    // Tab 2: MINH CHỨNG - DỮ LIỆU THẬT
+    const tableBody = document.querySelector('#anomaly-data-table tbody');
+    tableBody.innerHTML = config.renderEvidence(metrics.evidence);
     
-    // Update actions tab
-    document.getElementById('anomaly-actions').innerHTML = 
-        config.getActions().map(a => `<li>${a}</li>`).join('');
+    // Tab 3: TÍNH TOÁN
+    document.getElementById('anomaly-formula').innerHTML = getFormula(data.type, metrics);
     
-    // Show modal
+    // Tab 4: HÀNH ĐỘNG
+    const actionsList = document.getElementById('anomaly-actions');
+    actionsList.innerHTML = getActions(data.type).map(a => `<li>${a}</li>`).join('');
+    
+    // Mở modal
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
 }
 
+// ============================================
+// KHỞI TẠO KHI TRANG LOAD
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    // Gắn sự kiện click cho tất cả anomaly list items
+    document.querySelectorAll('.anomaly-list-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const jsonData = this.dataset.anomalyJson;
+            if (!jsonData) {
+                console.error('Không có dữ liệu JSON');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(jsonData);
+                showAnomalyDetailModal(data);
+            } catch(e) {
+                console.error('Lỗi parse JSON:', e);
+            }
+        });
+    });
+    
+    // Tab switching
+    document.querySelectorAll('.anomaly-tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+            
+            // Remove active
+            document.querySelectorAll('.anomaly-tab-btn').forEach(b => {
+                b.style.color = '#666';
+                b.style.borderBottomColor = 'transparent';
+            });
+            document.querySelectorAll('.anomaly-tab-content').forEach(c => c.style.display = 'none');
+            
+            // Add active
+            this.style.color = '#667eea';
+            this.style.borderBottomColor = '#667eea';
+            document.getElementById(`anomaly-${tabName}-tab`).style.display = 'block';
+        });
+    });
+});
+
+// ============================================
+// HELPER: ĐIỀU CHỈNH MÀU
+// ============================================
 function adjustColor(color, percent) {
     const num = parseInt(color.replace("#",""), 16);
     const amt = Math.round(2.55 * percent);
@@ -1305,23 +1546,6 @@ function adjustColor(color, percent) {
         (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255))
         .toString(16).slice(1);
 }
-
-// Tab switching
-document.querySelectorAll('.anomaly-tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const tabName = this.dataset.tab;
-        
-        document.querySelectorAll('.anomaly-tab-btn').forEach(b => {
-            b.style.color = '#666';
-            b.style.borderBottomColor = 'transparent';
-        });
-        document.querySelectorAll('.anomaly-tab-content').forEach(c => c.style.display = 'none');
-        
-        this.style.color = '#667eea';
-        this.style.borderBottomColor = '#667eea';
-        document.getElementById(`anomaly-${tabName}-tab`).style.display = 'block';
-    });
-});
 </script>
 </body>
 </html>

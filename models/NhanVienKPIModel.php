@@ -1,6 +1,7 @@
 <?php
 /**
- * ✅ MODEL KPI NHÂN VIÊN - Database GKHL
+ * ✅ MODEL KPI NHÂN VIÊN - Database DSVGKHL (Fixed)
+ * Chỉ sử dụng các cột có sẵn trong orderdetail
  */
 require_once 'config/database.php';
 
@@ -12,6 +13,9 @@ class NhanVienKPIModel {
         $this->conn = $database->getConnection();
     }
 
+    /**
+     * Lấy danh sách tháng có sẵn
+     */
     public function getAvailableMonths() {
         $sql = "SELECT DISTINCT CONCAT(RptYear, '-', LPAD(RptMonth, 2, '0')) as thang
                 FROM orderdetail
@@ -23,6 +27,9 @@ class NhanVienKPIModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
+    /**
+     * Lấy danh sách nhóm sản phẩm (2 ký tự đầu của ProductCode)
+     */
     public function getAvailableProducts() {
         $sql = "SELECT DISTINCT SUBSTRING(ProductCode, 1, 2) as product_prefix
                 FROM orderdetail 
@@ -34,6 +41,9 @@ class NhanVienKPIModel {
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
+    /**
+     * Lấy danh sách tất cả nhân viên (DSRCode)
+     */
     public function getAllEmployees() {
         $sql = "SELECT DISTINCT 
                     o.DSRCode,
@@ -48,6 +58,9 @@ class NhanVienKPIModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Lấy KPI theo ngày của nhân viên trong khoảng thời gian
+     */
     public function getEmployeeDailyKPI($dsr_code, $tu_ngay, $den_ngay, $product_filter = '') {
         $sql = "SELECT 
                     DATE(OrderDate) as order_date,
