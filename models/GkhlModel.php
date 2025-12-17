@@ -59,7 +59,7 @@ class GkhlModel {
             $stmt = $this->conn->prepare($sql);
             if (!$stmt) {
                 $this->conn->exec("SET FOREIGN_KEY_CHECKS=1");
-                return ['success' => false, 'error' => 'Lỗi prepare SQL: ' . $this->conn->error];
+                // return ['success' => false, 'error' => 'Lỗi prepare SQL: ' . $this->conn->error];
             }
 
             foreach ($rows as $rowNum => $row) {

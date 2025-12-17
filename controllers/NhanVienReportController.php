@@ -3,6 +3,7 @@
  * ✅ CONTROLLER: BÁO CÁO DOANH SỐ NHÂN VIÊN
  * Tích hợp từ ReportController.php cũ
  * Điều chỉnh cho database GKHL
+ * ⭐ Chỉ load dữ liệu khi user filter
  */
 
 require_once 'models/NhanVienReportModel.php';
@@ -31,6 +32,7 @@ class NhanVienReportController {
         $top_threshold = 0;
         $tong_nghi_van = 0;
         $thang = '';
+        $has_filtered = false; // ⭐ Flag để check xem user có filter không
         
         try {
             // ✅ Lấy danh sách tháng có sẵn
@@ -43,17 +45,34 @@ class NhanVienReportController {
                 return;
             }
             
-            // ✅ Lấy tháng từ GET
+            // ⭐ KiỂM TRA XEM USER ĐÃ SUBMIT FORM KHÔNG
+            $has_filtered = !empty($_GET['tu_ngay']) && !empty($_GET['den_ngay']);
+            
+            // Nếu chưa filter, chỉ show form trống
+            if (!$has_filtered) {
+                $thang = $available_months[0];
+                require_once 'views/nhanvien_report/report.php';
+                return;
+            }
+            
+            // ✅ LẤY THÁNG TỪ GET
             $thang = !empty($_GET['thang']) ? $_GET['thang'] : $available_months[0];
             if (!in_array($thang, $available_months)) {
                 $thang = $available_months[0];
             }
             
-            // ✅ Lấy khoảng ngày
-            $tu_ngay = !empty($_GET['tu_ngay']) ? $_GET['tu_ngay'] : $thang . '-01';
-            $den_ngay = !empty($_GET['den_ngay']) ? $_GET['den_ngay'] : date('Y-m-t', strtotime($thang . '-01'));
+            // ✅ LẤY KHOẢNG NGÀY
+            $tu_ngay = $_GET['tu_ngay'] ?? '';
+            $den_ngay = $_GET['den_ngay'] ?? '';
             
             // Validate & swap nếu cần
+            if (empty($tu_ngay) || empty($den_ngay)) {
+                $message = "⚠️ Vui lòng chọn khoảng ngày.";
+                $type = 'warning';
+                require_once 'views/nhanvien_report/report.php';
+                return;
+            }
+            
             if (strtotime($tu_ngay) > strtotime($den_ngay)) {
                 list($tu_ngay, $den_ngay) = [$den_ngay, $tu_ngay];
             }
@@ -65,24 +84,24 @@ class NhanVienReportController {
             if (strtotime($tu_ngay) < strtotime($thang_start)) $tu_ngay = $thang_start;
             if (strtotime($den_ngay) > strtotime($thang_end)) $den_ngay = $thang_end;
 
-            // ✅ Tính toán số ngày
+            // ✅ TÍNH TOÁN SỐ NGÀY
             $ngay_diff = intval((strtotime($den_ngay) - strtotime($tu_ngay)) / 86400);
             $so_ngay = max(1, $ngay_diff + 1);
             $so_ngay_trong_thang = intval(date('t', strtotime($thang_start)));
 
-            // ✅ Tổng tiền kỳ (cả tháng)
+            // ✅ TỔNG TIỀN KỲ (CẢ THÁNG)
             $tong_tien_ky = $this->model->getTotalByMonth($thang);
             
-            // ✅ Tổng tiền khoảng (chỉ trong khoảng ngày chọn)
+            // ✅ TỔNG TIỀN KHOẢNG (CHỈ TRONG KHOẢNG NGÀY CHỌN)
             $tong_tien_khoang = $this->model->getTotalByDateRange($tu_ngay, $den_ngay);
             
-            // ✅ Kết quả chung = Khoảng / Kỳ
+            // ✅ KẾT QUẢ CHUNG = Khoảng / Kỳ
             $ket_qua_chung = ($tong_tien_ky > 0) ? ($tong_tien_khoang / $tong_tien_ky) : 0;
             
-            // ✅ Tỉ lệ nghi vấn = Kết quả chung × 1.5
+            // ✅ TỈ LỆ NGHI VẤN = KẾT QUẢ CHUNG × 1.5
             $ty_le_nghi_van = $ket_qua_chung * 1.5;
 
-            // ✅ Lấy benchmark chi tiết
+            // ✅ LẤY BENCHMARK CHI TIẾT
             $tong_tien_ky_detailed = [
                 // Khoảng
                 'ds_tb_chung_khoang' => $this->model->getSystemRangeAveragePerDay($tu_ngay, $den_ngay),
@@ -99,7 +118,7 @@ class NhanVienReportController {
                 'so_ngay_trong_thang' => $so_ngay_trong_thang
             ];
 
-            // ✅ Lấy danh sách nhân viên
+            // ✅ LẤY DANH SÁCH NHÂN VIÊN
             $employees = $this->model->getAllEmployees();
 
             if (empty($employees)) {
@@ -109,7 +128,7 @@ class NhanVienReportController {
                 return;
             }
 
-            // ✅ Tính toán cho từng nhân viên
+            // ✅ TÍNH TOÁN CHO TỪNG NHÂN VIÊN
             $report_nghi_van = [];
             $report_ok = [];
             
@@ -163,12 +182,12 @@ class NhanVienReportController {
                 }
             }
 
-            // ✅ Sắp xếp nhóm nghi vấn
+            // ✅ SẮP XẾP NHÓM NGHI VẤN
             usort($report_nghi_van, function($a, $b) {
                 return $b['ty_le'] <=> $a['ty_le'];
             });
             
-            // ✅ Xác định top highlight
+            // ✅ XÁC ĐỊNH TOP HIGHLIGHT
             $tong_nghi_van = count($report_nghi_van);
             
             if ($tong_nghi_van >= 20) {
@@ -183,7 +202,7 @@ class NhanVienReportController {
                 $top_threshold = $tong_nghi_van;
             }
             
-            // Thêm rank & highlight
+            // THÊM RANK & HIGHLIGHT
             foreach ($report_nghi_van as $key => &$item) {
                 $item['rank'] = $key + 1;
                 $item['highlight_type'] = ($item['rank'] <= $top_threshold) ? 'red' : 'orange';
@@ -196,7 +215,7 @@ class NhanVienReportController {
             }
             unset($item);
             
-            // Gộp lại
+            // GỘP LẠI
             $report = array_merge($report_nghi_van, $report_ok);
             
             $debug_info = "Tháng: $thang | Nhân viên: " . count($employees) . " | Nghi vấn: $tong_nghi_van | Top: $top_threshold";

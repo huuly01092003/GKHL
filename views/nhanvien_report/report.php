@@ -20,11 +20,13 @@
         .bg-red-highlight { background: linear-gradient(90deg, #fee 0%, #fdd 100%) !important; border-left: 4px solid #dc3545 !important; }
         .bg-orange-highlight { background: linear-gradient(90deg, #fff5e6 0%, #ffe6cc 100%) !important; border-left: 4px solid #ff9800 !important; }
         .bg-none-highlight { background: white !important; }
-        .legend { display: flex; gap: 20px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; }
+        .legend { display: flex; gap: 20px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 10px; }
         .legend-color { width: 40px; height: 30px; border-radius: 5px; border-left: 4px solid; }
         .btn-group-custom { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         .debug-info { background: #f8f9fa; border-left: 4px solid #667eea; padding: 10px 15px; margin-top: 20px; border-radius: 4px; font-size: 0.9rem; color: #555; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state i { font-size: 4rem; color: #ddd; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -78,139 +80,155 @@
                 </div>
             </form>
 
-            <!-- Tổng Quan -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="info-box">
-                        <small><i class="fas fa-calendar-days"></i> Số Ngày</small>
-                        <h5><?= intval($so_ngay) ?> ngày</h5>
+            <!-- ⭐ EMPTY STATE - Khi chưa filter -->
+            <?php if (!$has_filtered): ?>
+                <div class="empty-state">
+                    <i class="fas fa-filter"></i>
+                    <h4>Vui lòng chọn khoảng ngày để bắt đầu</h4>
+                    <p class="text-muted">Hệ thống sẽ tính toán dữ liệu khi bạn nhấn "Rà Soát"</p>
+                </div>
+            <?php else: ?>
+                <!-- Tổng Quan -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="info-box">
+                            <small><i class="fas fa-calendar-days"></i> Số Ngày</small>
+                            <h5><?= intval($so_ngay) ?> ngày</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box">
+                            <small><i class="fas fa-money-bill-wave"></i> Tổng Tiền Kỳ (Tháng)</small>
+                            <h5><?= number_format($tong_tien_ky, 0) ?>đ</h5>
+                            <small class="text-muted">Chỉ tính tháng: <?= date('m/Y', strtotime($thang . '-01')) ?></small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box">
+                            <small><i class="fas fa-hourglass-half"></i> Tổng Tiền Khoảng</small>
+                            <h5><?= number_format($tong_tien_khoang, 0) ?>đ</h5>
+                            <small class="text-muted"><?= $tu_ngay ?> ~ <?= $den_ngay ?></small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="info-box">
+                            <small><i class="fas fa-exclamation-triangle"></i> Kết Quả Chung</small>
+                            <h5><span class="badge bg-warning text-dark"><?= number_format($ket_qua_chung * 100, 2) ?>%</span></h5>
+                            <small class="text-muted">Khoảng/Kỳ</small>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="info-box">
-                        <small><i class="fas fa-money-bill-wave"></i> Tổng Tiền Kỳ (Tháng)</small>
-                        <h5><?= number_format($tong_tien_ky, 0) ?>đ</h5>
-                        <small class="text-muted">Chỉ tính tháng: <?= date('m/Y', strtotime($thang . '-01')) ?></small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="info-box">
-                        <small><i class="fas fa-hourglass-half"></i> Tổng Tiền Khoảng</small>
-                        <h5><?= number_format($tong_tien_khoang, 0) ?>đ</h5>
-                        <small class="text-muted"><?= $tu_ngay ?> ~ <?= $den_ngay ?></small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="info-box">
-                        <small><i class="fas fa-exclamation-triangle"></i> Kết Quả Chung</small>
-                        <h5><span class="badge bg-warning text-dark"><?= number_format($ket_qua_chung * 100, 2) ?>%</span></h5>
-                        <small class="text-muted">Khoảng/Kỳ</small>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Tỉ lệ Nghi Vấn -->
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="info-box">
-                        <small><i class="fas fa-eye"></i> Tỉ Lệ Hoàn Thành Nghi Vấn (Kết quả chung × 1.5)</small>
-                        <h5><span class="badge bg-danger"><?= number_format($ty_le_nghi_van * 100, 2) ?>%</span></h5>
+                <!-- Tỉ lệ Nghi Vấn -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="info-box">
+                            <small><i class="fas fa-eye"></i> Tỉ Lệ Hoàn Thành Nghi Vấn (Kết quả chung × 1.5)</small>
+                            <h5><span class="badge bg-danger"><?= number_format($ty_le_nghi_van * 100, 2) ?>%</span></h5>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-box">
+                            <small><i class="fas fa-user-secret"></i> Số Người Nghi Vấn Gian Lận</small>
+                            <h5><span class="badge bg-danger" style="font-size: 18px;"><?= $tong_nghi_van ?> người</span></h5>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="info-box">
-                        <small><i class="fas fa-user-secret"></i> Số Người Nghi Vấn Gian Lận</small>
-                        <h5><span class="badge bg-danger" style="font-size: 18px;"><?= $tong_nghi_van ?> người</span></h5>
+
+                <!-- Legend -->
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(90deg, #fee 0%, #fdd 100%); border-left-color: #dc3545;"></div>
+                        <span><strong>Đỏ:</strong> Top <?= $top_threshold ?> Gian Lận Nghiêm Trọng</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(90deg, #fff5e6 0%, #ffe6cc 100%); border-left-color: #ff9800;"></div>
+                        <span><strong>Cam:</strong> Nghi Vấn Gian Lận Còn Lại (<?= max(0, $tong_nghi_van - $top_threshold) ?> người)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: white; border-left-color: #e0e0e0;"></div>
+                        <span><strong>Trắng:</strong> Không Nghi Vấn (OK)</span>
                     </div>
                 </div>
-            </div>
 
-            <!-- Legend -->
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(90deg, #fee 0%, #fdd 100%); border-left-color: #dc3545;"></div>
-                    <span><strong>Đỏ:</strong> Top <?= $top_threshold ?> Gian Lận Nghiêm Trọng</span>
+                <!-- Bảng Báo Cáo -->
+                <div class="table-responsive" style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;">
+                    <table class="table table-hover kpi-table" style="margin-bottom: 0;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width: 60px;">#</th>
+                                <th style="width: 100px;">Mã NV</th>
+                                <th>Tên Nhân Viên</th>
+                                <th>Tỉnh</th>
+                                <th class="text-end">DS Tìm Kiếm</th>
+                                <th class="text-end">DS Tiến Độ</th>
+                                <th class="text-end">% Tiến Độ</th>
+                                <th class="text-center">Chi Tiết</th>
+                                <th class="text-end">Trạng Thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php if (!empty($report)): ?>
+                            <?php foreach ($report as $r): ?>
+                            <?php
+                                if ($r['highlight_type'] === 'red') {
+                                    $row_class = 'bg-red-highlight';
+                                } elseif ($r['highlight_type'] === 'orange') {
+                                    $row_class = 'bg-orange-highlight';
+                                } else {
+                                    $row_class = 'bg-none-highlight';
+                                }
+                            ?>
+                            <tr class="<?= $row_class ?>">
+                                <td class="text-center fw-bold">
+                                    <?php if ($r['rank'] > 0): ?>
+                                        <span class="badge <?= ($r['highlight_type'] === 'red') ? 'bg-danger' : 'bg-warning text-dark' ?>">#<?= $r['rank'] ?></span>
+                                    <?php else: ?>
+                                        <span class="badge bg-light text-dark">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><strong><?= htmlspecialchars($r['ma_nv']) ?></strong></td>
+                                <td><?= htmlspecialchars($r['ten_nv'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($r['tinh'] ?? '') ?></td>
+                                <td class="text-end"><?= number_format($r['ds_tim_kiem'], 0) ?>đ</td>
+                                <td class="text-end"><?= number_format($r['ds_tien_do'], 0) ?>đ</td>
+                                <td class="text-end">
+                                    <strong class="<?= ($r['ty_le'] >= $ty_le_nghi_van) ? 'text-danger' : 'text-success' ?>">
+                                        <?= number_format($r['ty_le'] * 100, 2) ?>%
+                                    </strong>
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            type="button"
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#detailModal"
+                                            onclick="showReportDetails('<?= htmlspecialchars(json_encode($r)) ?>', '<?= htmlspecialchars(json_encode($tong_tien_ky_detailed)) ?>')">
+                                        <i class="fas fa-eye"></i> Xem
+                                    </button>
+                                </td>
+                                <td class="text-end">
+                                    <?php if ($r['is_suspect']): ?>
+                                        <span class="badge bg-danger">⚠️ NGHI VẤN</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-success">✅ OK</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="9" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(90deg, #fff5e6 0%, #ffe6cc 100%); border-left-color: #ff9800;"></div>
-                    <span><strong>Cam:</strong> Nghi Vấn Gian Lận Còn Lại (<?= max(0, $tong_nghi_van - $top_threshold) ?> người)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: white; border-left-color: #e0e0e0;"></div>
-                    <span><strong>Trắng:</strong> Không Nghi Vấn (OK)</span>
-                </div>
-            </div>
 
-            <!-- Bảng Báo Cáo -->
-            <div class="table-responsive" style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;">
-                <table class="table table-hover kpi-table" style="margin-bottom: 0;">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="text-center" style="width: 60px;">#</th>
-                            <th style="width: 100px;">Mã NV</th>
-                            <th>Tên Nhân Viên</th>
-                            <th>Tỉnh</th>
-                            <th class="text-end">DS Tìm Kiếm</th>
-                            <th class="text-end">DS Tiến Độ</th>
-                            <th class="text-end">% Tiến Độ</th>
-                            <th class="text-center">Chi Tiết</th>
-                            <th class="text-end">Trạng Thái</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php if (!empty($report)): ?>
-                        <?php foreach ($report as $r): ?>
-                        <?php
-                            if ($r['highlight_type'] === 'red') {
-                                $row_class = 'bg-red-highlight';
-                            } elseif ($r['highlight_type'] === 'orange') {
-                                $row_class = 'bg-orange-highlight';
-                            } else {
-                                $row_class = 'bg-none-highlight';
-                            }
-                        ?>
-                        <tr class="<?= $row_class ?>">
-                            <td class="text-center fw-bold">
-                                <?php if ($r['rank'] > 0): ?>
-                                    <span class="badge <?= ($r['highlight_type'] === 'red') ? 'bg-danger' : 'bg-warning text-dark' ?>">#<?= $r['rank'] ?></span>
-                                <?php else: ?>
-                                    <span class="badge bg-light text-dark">-</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><strong><?= htmlspecialchars($r['ma_nv']) ?></strong></td>
-                            <td><?= htmlspecialchars($r['ten_nv'] ?? '') ?></td>
-                            <td><?= htmlspecialchars($r['tinh'] ?? '') ?></td>
-                            <td class="text-end"><?= number_format($r['ds_tim_kiem'], 0) ?>đ</td>
-                            <td class="text-end"><?= number_format($r['ds_tien_do'], 0) ?>đ</td>
-                            <td class="text-end">
-                                <strong class="<?= ($r['ty_le'] >= $ty_le_nghi_van) ? 'text-danger' : 'text-success' ?>">
-                                    <?= number_format($r['ty_le'] * 100, 2) ?>%
-                                </strong>
-                            </td>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-outline-primary" 
-                                        type="button"
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#detailModal"
-                                        onclick="showReportDetails('<?= htmlspecialchars(json_encode($r)) ?>', '<?= htmlspecialchars(json_encode($tong_tien_ky_detailed)) ?>')">
-                                    <i class="fas fa-eye"></i> Xem
-                                </button>
-                            </td>
-                            <td class="text-end">
-                                <?php if ($r['is_suspect']): ?>
-                                    <span class="badge bg-danger">⚠️ NGHI VẤN</span>
-                                <?php else: ?>
-                                    <span class="badge bg-success">✅ OK</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="9" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+                <!-- Debug Info -->
+                <?php if (!empty($debug_info)): ?>
+                <div class="debug-info">
+                    <strong>📊 Thông Tin:</strong> <?= htmlspecialchars($debug_info) ?>
+                </div>
+                <?php endif; ?>
+            <?php endif; ?>
 
             <!-- Action Buttons -->
             <div class="btn-group-custom">
@@ -224,13 +242,6 @@
                     <i class="fas fa-sync"></i> Làm Mới
                 </a>
             </div>
-
-            <!-- Debug Info -->
-            <?php if (!empty($debug_info)): ?>
-            <div class="debug-info">
-                <strong>📊 Thông Tin:</strong> <?= htmlspecialchars($debug_info) ?>
-            </div>
-            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -330,13 +341,13 @@ function showReportDetails(jsonData, jsonBenchmark) {
                 </div>
                 
                 <div style="margin-bottom: 10px;">
-                    <strong>🔝 DS Ngày Cao Nhất (NV):</strong> ${formatCurrency(dsMaxKhoang_NV)}
+                    <strong>📈 DS Ngày Cao Nhất (NV):</strong> ${formatCurrency(dsMaxKhoang_NV)}
                 </div>
                 <div style="margin-bottom: 10px;">
-                    <strong>🔝 DS Ngày Cao Nhất TB (Chung):</strong> ${formatCurrency(dsMaxKhoang_Chung)}
+                    <strong>📈 DS Ngày Cao Nhất TB (Chung):</strong> ${formatCurrency(dsMaxKhoang_Chung)}
                 </div>
                 <div>
-                    <strong>🔝 Chênh Lệch:</strong> 
+                    <strong>📈 Chênh Lệch:</strong> 
                     <span style="color: ${getCompareColor(dsMaxKhoang_NV, dsMaxKhoang_Chung)};">
                         ${getCompareIcon(dsMaxKhoang_NV, dsMaxKhoang_Chung)} ${Math.abs(calcPercent(dsMaxKhoang_NV, dsMaxKhoang_Chung)).toFixed(1)}%
                     </span>
@@ -362,13 +373,13 @@ function showReportDetails(jsonData, jsonBenchmark) {
                 </div>
                 
                 <div style="margin-bottom: 10px;">
-                    <strong>🔝 DS Ngày Cao Nhất (NV-Tháng):</strong> ${formatCurrency(dsMaxThang_NV)}
+                    <strong>📈 DS Ngày Cao Nhất (NV-Tháng):</strong> ${formatCurrency(dsMaxThang_NV)}
                 </div>
                 <div style="margin-bottom: 10px;">
-                    <strong>🔝 DS Ngày Cao Nhất TB (Chung-Tháng):</strong> ${formatCurrency(dsMaxThang_Chung)}
+                    <strong>📈 DS Ngày Cao Nhất TB (Chung-Tháng):</strong> ${formatCurrency(dsMaxThang_Chung)}
                 </div>
                 <div>
-                    <strong>🔝 Chênh Lệch:</strong> 
+                    <strong>📈 Chênh Lệch:</strong> 
                     <span style="color: ${getCompareColor(dsMaxThang_NV, dsMaxThang_Chung)};">
                         ${getCompareIcon(dsMaxThang_NV, dsMaxThang_Chung)} ${Math.abs(calcPercent(dsMaxThang_NV, dsMaxThang_Chung)).toFixed(1)}%
                     </span>

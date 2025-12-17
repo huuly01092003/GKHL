@@ -33,6 +33,8 @@
         .legend-badge { width: 30px; height: 20px; border-radius: 5px; }
         .btn-group-custom { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         .debug-info { background: #f8f9fa; border-left: 4px solid #667eea; padding: 10px 15px; margin-top: 20px; border-radius: 4px; font-size: 0.9rem; color: #555; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state i { font-size: 4rem; color: #ddd; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -103,153 +105,173 @@
                 </div>
             </form>
 
-            <div class="row g-3 mt-2">
-                <div class="col-md-2">
-                    <div class="kpi-card kpi-card-info">
-                        <div class="kpi-icon"><i class="fas fa-users"></i></div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Nhân Viên Có ĐH</div>
-                            <div class="kpi-value"><?= $statistics['employees_with_orders'] ?? 0 ?></div>
-                            <div class="kpi-subtext">/ <?= $statistics['total_employees'] ?? 0 ?></div>
+            <!-- ⭐ EMPTY STATE - Khi chưa filter -->
+            <?php if (!$has_filtered): ?>
+                <div class="empty-state">
+                    <i class="fas fa-filter"></i>
+                    <h4>Vui lòng chọn khoảng ngày để bắt đầu</h4>
+                    <p class="text-muted">Hệ thống sẽ tính toán dữ liệu khi bạn nhấn "Lọc"</p>
+                </div>
+            <?php else: ?>
+                <!-- KPI Cards -->
+                <div class="row g-3 mt-2">
+                    <div class="col-md-2">
+                        <div class="kpi-card kpi-card-info">
+                            <div class="kpi-icon"><i class="fas fa-users"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Nhân Viên Có ĐH</div>
+                                <div class="kpi-value"><?= $statistics['employees_with_orders'] ?? 0 ?></div>
+                                <div class="kpi-subtext">/ <?= $statistics['total_employees'] ?? 0 ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="kpi-card kpi-card-primary">
+                            <div class="kpi-icon"><i class="fas fa-shopping-cart"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Tổng Đơn Hàng</div>
+                                <div class="kpi-value"><?= number_format($statistics['total_orders'] ?? 0) ?></div>
+                                <div class="kpi-subtext">đơn</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="kpi-card kpi-card-success">
+                            <div class="kpi-icon"><i class="fas fa-chart-bar"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">TBD Chung</div>
+                                <div class="kpi-value"><?= number_format($statistics['avg_orders_per_emp'] ?? 0, 1) ?></div>
+                                <div class="kpi-subtext">đơn/NV</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="kpi-card kpi-card-warning">
+                            <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Cảnh Báo</div>
+                                <div class="kpi-value"><?= $statistics['warning_count'] ?? 0 ?></div>
+                                <div class="kpi-subtext">người</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="kpi-card kpi-card-danger">
+                            <div class="kpi-icon"><i class="fas fa-virus"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Nguy Hiểm</div>
+                                <div class="kpi-value"><?= $statistics['danger_count'] ?? 0 ?></div>
+                                <div class="kpi-subtext">người</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="kpi-card kpi-card-light">
+                            <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Bình Thường</div>
+                                <div class="kpi-value"><?= $statistics['normal_count'] ?? 0 ?></div>
+                                <div class="kpi-subtext">người</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <div class="kpi-card kpi-card-primary">
-                        <div class="kpi-icon"><i class="fas fa-shopping-cart"></i></div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Tổng Đơn Hàng</div>
-                            <div class="kpi-value"><?= number_format($statistics['total_orders'] ?? 0) ?></div>
-                            <div class="kpi-subtext">đơn</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="kpi-card kpi-card-success">
-                        <div class="kpi-icon"><i class="fas fa-chart-bar"></i></div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">TBD Chung</div>
-                            <div class="kpi-value"><?= number_format($statistics['avg_orders_per_emp'] ?? 0, 1) ?></div>
-                            <div class="kpi-subtext">đơn/NV</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="kpi-card kpi-card-warning">
-                        <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Cảnh Báo</div>
-                            <div class="kpi-value"><?= $statistics['warning_count'] ?? 0 ?></div>
-                            <div class="kpi-subtext">người</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="kpi-card kpi-card-danger">
-                        <div class="kpi-icon"><i class="fas fa-virus"></i></div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Nguy Hiểm</div>
-                            <div class="kpi-value"><?= $statistics['danger_count'] ?? 0 ?></div>
-                            <div class="kpi-subtext">người</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="kpi-card kpi-card-light">
-                        <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Bình Thường</div>
-                            <div class="kpi-value"><?= $statistics['normal_count'] ?? 0 ?></div>
-                            <div class="kpi-subtext">người</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <div class="benchmark-box">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="benchmark-item">
-                            <strong>📊 TBD Cao Nhất (Chung):</strong>
-                            <span class="badge bg-success"><?= number_format($statistics['max_daily_orders'] ?? 0, 1) ?> đơn</span>
+                <!-- Benchmark Box -->
+                <div class="benchmark-box">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="benchmark-item">
+                                <strong>📊 TBD Cao Nhất (Chung):</strong>
+                                <span class="badge bg-success"><?= number_format($statistics['max_daily_orders'] ?? 0, 1) ?> đơn</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="benchmark-item">
-                            <strong>📊 TBD Chung:</strong>
-                            <span class="badge bg-info"><?= number_format($statistics['avg_daily_orders'] ?? 0, 2) ?> đơn</span>
+                        <div class="col-md-4">
+                            <div class="benchmark-item">
+                                <strong>📊 TBD Chung:</strong>
+                                <span class="badge bg-info"><?= number_format($statistics['avg_daily_orders'] ?? 0, 2) ?> đơn</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="benchmark-item">
-                            <strong>📈 Độ Biến Động (Std Dev):</strong>
-                            <span class="badge bg-warning text-dark"><?= number_format($statistics['std_dev_orders'] ?? 0, 2) ?></span>
+                        <div class="col-md-4">
+                            <div class="benchmark-item">
+                                <strong>📈 Độ Biến Động (Std Dev):</strong>
+                                <span class="badge bg-warning text-dark"><?= number_format($statistics['std_dev_orders'] ?? 0, 2) ?></span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="kpi-legend">
-                <div class="legend-item"><span class="legend-badge" style="background: #ff6b6b;"></span> <strong>Critical (75-100)</strong></div>
-                <div class="legend-item"><span class="legend-badge" style="background: #ffc107;"></span> <strong>Warning (50-74)</strong></div>
-                <div class="legend-item"><span class="legend-badge" style="background: #28a745;"></span> <strong>Normal (0-49)</strong></div>
-            </div>
+                <!-- Legend -->
+                <div class="kpi-legend">
+                    <div class="legend-item"><span class="legend-badge" style="background: #ff6b6b;"></span> <strong>Critical (75-100)</strong></div>
+                    <div class="legend-item"><span class="legend-badge" style="background: #ffc107;"></span> <strong>Warning (50-74)</strong></div>
+                    <div class="legend-item"><span class="legend-badge" style="background: #28a745;"></span> <strong>Normal (0-49)</strong></div>
+                </div>
 
-            <div class="table-responsive mt-4" style="max-height: 600px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 5px;">
-                <table class="table table-hover kpi-table" style="margin-bottom: 0;">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="text-center" style="width: 60px;">Mức Độ</th>
-                            <th style="width: 100px;">Mã NV</th>
-                            <th>Tên Nhân Viên</th>
-                            <th class="text-end">Tổng ĐH</th>
-                            <th class="text-end">TBD/Ngày</th>
-                            <th class="text-end">Max/Ngày</th>
-                            <th class="text-end">Min/Ngày</th>
-                            <th class="text-center">Nhất Quán %</th>
-                            <th class="text-end">Risk Score</th>
-                            <th class="text-center">Chi Tiết</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php if (!empty($kpi_data)): ?>
-                        <?php foreach ($kpi_data as $item): ?>
-                        <?php
-                            $risk_level = isset($item['risk_level']) ? $item['risk_level'] : 'normal';
-                            $badge_class = ($risk_level === 'critical') ? 'bg-danger' : (($risk_level === 'warning') ? 'bg-warning text-dark' : 'bg-success');
-                            $icon = ($risk_level === 'critical') ? '🚨' : (($risk_level === 'warning') ? '⚠️' : '✅');
-                        ?>
-                        <tr>
-                            <td class="text-center"><span class="badge <?= $badge_class ?>"><?= $icon ?></span></td>
-                            <td><strong><?= htmlspecialchars($item['ma_nv'] ?? '') ?></strong></td>
-                            <td><?= htmlspecialchars($item['ten_nv'] ?? '') ?></td>
-                            <td class="text-end fw-bold"><?= number_format($item['total_orders'] ?? 0) ?></td>
-                            <td class="text-end"><?= number_format($item['avg_daily_orders'] ?? 0, 1) ?></td>
-                            <td class="text-end text-success"><strong><?= $item['max_day_orders'] ?? 0 ?></strong></td>
-                            <td class="text-end text-muted"><?= $item['min_day_orders'] ?? 0 ?></td>
-                            <td class="text-center"><span class="badge bg-info"><?= round($item['consistency_score'] ?? 0, 0) ?>%</span></td>
-                            <td class="text-end">
-                                <span style="padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; background: <?= ($risk_level === 'critical') ? '#ff6b6b' : (($risk_level === 'warning') ? '#ffc107' : '#28a745') ?>;">
-                                    <?= $item['risk_score'] ?? 0 ?>
-                                </span>
-                            </td>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-outline-primary btn-detail" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#detailModal"
-                                        data-json="<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>">
-                                    <i class="fas fa-eye"></i> Chi Tiết
-                                </button>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="10" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+                <!-- Data Table -->
+                <div class="table-responsive mt-4" style="max-height: 600px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 5px;">
+                    <table class="table table-hover kpi-table" style="margin-bottom: 0;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width: 60px;">Mức Độ</th>
+                                <th style="width: 100px;">Mã NV</th>
+                                <th>Tên Nhân Viên</th>
+                                <th class="text-end">Tổng ĐH</th>
+                                <th class="text-end">TBD/Ngày</th>
+                                <th class="text-end">Max/Ngày</th>
+                                <th class="text-end">Min/Ngày</th>
+                                <th class="text-center">Nhất Quán %</th>
+                                <th class="text-end">Risk Score</th>
+                                <th class="text-center">Chi Tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php if (!empty($kpi_data)): ?>
+                            <?php foreach ($kpi_data as $item): ?>
+                            <?php
+                                $risk_level = isset($item['risk_level']) ? $item['risk_level'] : 'normal';
+                                $badge_class = ($risk_level === 'critical') ? 'bg-danger' : (($risk_level === 'warning') ? 'bg-warning text-dark' : 'bg-success');
+                                $icon = ($risk_level === 'critical') ? '🚨' : (($risk_level === 'warning') ? '⚠️' : '✅');
+                            ?>
+                            <tr>
+                                <td class="text-center"><span class="badge <?= $badge_class ?>"><?= $icon ?></span></td>
+                                <td><strong><?= htmlspecialchars($item['ma_nv'] ?? '') ?></strong></td>
+                                <td><?= htmlspecialchars($item['ten_nv'] ?? '') ?></td>
+                                <td class="text-end fw-bold"><?= number_format($item['total_orders'] ?? 0) ?></td>
+                                <td class="text-end"><?= number_format($item['avg_daily_orders'] ?? 0, 1) ?></td>
+                                <td class="text-end text-success"><strong><?= $item['max_day_orders'] ?? 0 ?></strong></td>
+                                <td class="text-end text-muted"><?= $item['min_day_orders'] ?? 0 ?></td>
+                                <td class="text-center"><span class="badge bg-info"><?= round($item['consistency_score'] ?? 0, 0) ?>%</span></td>
+                                <td class="text-end">
+                                    <span style="padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; background: <?= ($risk_level === 'critical') ? '#ff6b6b' : (($risk_level === 'warning') ? '#ffc107' : '#28a745') ?>;">
+                                        <?= $item['risk_score'] ?? 0 ?>
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary btn-detail" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#detailModal"
+                                            data-json="<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>">
+                                        <i class="fas fa-eye"></i> Chi Tiết
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="10" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
 
+                <?php if (!empty($debug_info)): ?>
+                <div class="debug-info">
+                    <strong>📊 Thông Tin:</strong> <?= htmlspecialchars($debug_info) ?>
+                </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <!-- Action Buttons -->
             <div class="btn-group-custom">
                 <a href="nhanvien_report.php" class="btn btn-info">
                     <i class="fas fa-chart-line"></i> Báo Cáo Doanh Số
@@ -261,17 +283,11 @@
                     <i class="fas fa-sync"></i> Làm Mới
                 </a>
             </div>
-
-            <?php if (!empty($debug_info)): ?>
-            <div class="debug-info">
-                <strong>📊 Thông Tin:</strong> <?= htmlspecialchars($debug_info) ?>
-            </div>
-            <?php endif; ?>
-
         </div>
     </div>
 </div>
 
+<!-- Detail Modal -->
 <div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -313,7 +329,7 @@ function showKPIDetails(jsonData) {
             </div>
             
             <div class="row mb-3">
-                <div class="col-6"><strong>Mã NV:</strong> ${data.ma_nv}</div>
+                <div class="col-6"><strong>Mã NV:</strong> ${escapeHtml(data.ma_nv)}</div>
                 <div class="col-6"><strong>Tổng Đơn:</strong> ${data.total_orders}</div>
                 <div class="col-6"><strong>TBD/Ngày:</strong> ${data.avg_daily_orders}</div>
                 <div class="col-6"><strong>Nhất Quán:</strong> ${data.consistency_score}%</div>
@@ -324,7 +340,7 @@ function showKPIDetails(jsonData) {
         `;
         
         if (data.risk_reasons && data.risk_reasons.length > 0) {
-            data.risk_reasons.forEach(r => html += `<li>${r}</li>`);
+            data.risk_reasons.forEach(r => html += `<li>${escapeHtml(r)}</li>`);
         } else {
             html += `<li class="text-success">Hoạt động bình thường</li>`;
         }
@@ -335,6 +351,12 @@ function showKPIDetails(jsonData) {
         console.error('Detail Error:', e);
         document.getElementById('modalContent').innerHTML = '<div class="alert alert-danger">Lỗi hiển thị dữ liệu: ' + e.message + '</div>';
     }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 </script>
 </body>
