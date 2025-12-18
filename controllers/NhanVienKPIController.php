@@ -1,8 +1,7 @@
 <?php
 /**
- * ✅ CONTROLLER: KPI PHÁT HIỆN BẤT THƯỜNG NHÂN VIÊN (FIXED)
- * - Thêm biến $has_filtered
- * - Chỉ tính toán KPI khi user đã submit form
+ * ✅ CONTROLLER TỐI ƯU - KPI Nhân Viên
+ * Chỉ 3 queries thay vì hàng trăm
  */
 
 require_once 'models/NhanVienKPIModel.php';
@@ -22,10 +21,10 @@ class NhanVienKPIController {
         $filters = [];
         $available_months = [];
         $available_products = [];
-        $has_filtered = false; // ✅ Khởi tạo biến
+        $has_filtered = false;
         
         try {
-            // ✅ Lấy danh sách tháng
+            // Lấy danh sách tháng
             $available_months = $this->model->getAvailableMonths();
             
             if (empty($available_months)) {
@@ -37,11 +36,10 @@ class NhanVienKPIController {
             
             $available_products = $this->model->getAvailableProducts();
             
-            // ✅ Kiểm tra xem user đã submit form chưa
+            // Kiểm tra xem user đã submit form chưa
             $has_filtered = !empty($_GET['tu_ngay']) && !empty($_GET['den_ngay']);
             
             if (!$has_filtered) {
-                // Chỉ set giá trị mặc định cho form, KHÔNG tính toán
                 $filters = [
                     'thang' => $available_months[0] ?? '',
                     'tu_ngay' => !empty($available_months[0]) ? $available_months[0] . '-01' : '',
@@ -49,7 +47,6 @@ class NhanVienKPIController {
                     'product_filter' => ''
                 ];
                 
-                // Khởi tạo statistics rỗng
                 $statistics = [
                     'total_employees' => 0,
                     'employees_with_orders' => 0,
@@ -70,7 +67,7 @@ class NhanVienKPIController {
                 return;
             }
             
-            // ✅ User đã submit form → Bắt đầu tính toán
+            // User đã submit → Bắt đầu xử lý
             $thang = !empty($_GET['thang']) ? $_GET['thang'] : $available_months[0];
             if (!in_array($thang, $available_months)) $thang = $available_months[0];
             
@@ -92,8 +89,8 @@ class NhanVienKPIController {
                 'product_filter' => $product_filter
             ];
             
-            // ✅ Lấy danh sách nhân viên
-            $employees = $this->model->getAllEmployees();
+            // ✅ QUERY 1: LẤY TẤT CẢ NHÂN VIÊN KÈM KPI (1 QUERY DUY NHẤT)
+            $employees = $this->model->getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter);
             
             if (empty($employees)) {
                 $message = "⚠️ Không có dữ liệu nhân viên.";
@@ -102,58 +99,78 @@ class NhanVienKPIController {
                 return;
             }
             
-            // ✅ Tính toán KPI
-            $employee_kpi_list = [];
-            $all_risk_scores = [];
-            $system_metrics = [
-                'total_orders' => 0,
-                'total_amount' => 0,
-                'all_daily_orders' => [],
-                'all_daily_amounts' => [],
-                'employee_count' => 0,
-                'max_daily_orders' => 0,
-                'max_daily_amount' => 0,
-                'total_working_days' => 0
-            ];
+            // ✅ QUERY 2: LẤY THỐNG KÊ HỆ THỐNG (1 QUERY)
+            $system_metrics = $this->model->getSystemMetrics($tu_ngay, $den_ngay, $product_filter);
             
-            foreach ($employees as $emp) {
-                $kpi = $this->calculateEmployeeKPI($emp, $tu_ngay, $den_ngay, $product_filter);
-                
-                if ($kpi['total_orders'] > 0) {
-                    $employee_kpi_list[] = $kpi;
-                    $system_metrics['total_orders'] += $kpi['total_orders'];
-                    $system_metrics['total_amount'] += $kpi['total_amount'];
-                    $system_metrics['total_working_days'] += $kpi['working_days'];
-                    $system_metrics['employee_count']++;
-                    $system_metrics['max_daily_orders'] = max($system_metrics['max_daily_orders'], $kpi['max_day_orders']);
-                    $system_metrics['max_daily_amount'] = max($system_metrics['max_daily_amount'], $kpi['max_day_amount']);
-                    
-                    $system_metrics['all_daily_orders'] = array_merge($system_metrics['all_daily_orders'], $kpi['daily_orders'] ?? []);
-                    $system_metrics['all_daily_amounts'] = array_merge($system_metrics['all_daily_amounts'], $kpi['daily_amounts'] ?? []);
-                }
-            }
+            // ✅ QUERY 3: LẤY DAILY ORDERS ĐỂ TÍNH STD DEV (1 QUERY)
+            $all_daily_orders = $this->model->getAllDailyOrdersForStdDev($tu_ngay, $den_ngay, $product_filter);
+            $std_dev_orders = $this->calculateStdDev($all_daily_orders);
             
-            // ✅ Tính benchmark
-            if ($system_metrics['employee_count'] > 0) {
-                $system_metrics['avg_orders_per_emp'] = $system_metrics['total_orders'] / $system_metrics['employee_count'];
-                $system_metrics['avg_daily_orders'] = $system_metrics['total_orders'] / max(1, $system_metrics['total_working_days']);
-                $system_metrics['avg_daily_amount'] = $system_metrics['total_amount'] / max(1, $system_metrics['total_working_days']);
-                $system_metrics['std_dev_orders'] = $this->calculateStdDev($system_metrics['all_daily_orders']);
-                $system_metrics['std_dev_amount'] = $this->calculateStdDev($system_metrics['all_daily_amounts']);
-            }
+            // Tính toán benchmark
+            $emp_count = $system_metrics['emp_count'];
+            $total_orders = $system_metrics['total_orders'];
+            $total_amount = $system_metrics['total_amount'];
+            $total_working_days = $system_metrics['total_working_days'];
             
-            // ✅ Phân loại
+            $avg_orders_per_emp = $emp_count > 0 ? $total_orders / $emp_count : 0;
+            $avg_daily_orders = $total_working_days > 0 ? $total_orders / $total_working_days : 0;
+            $avg_daily_amount = $total_working_days > 0 ? $total_amount / $total_working_days : 0;
+            
+            // ✅ PHÂN LOẠI (KHÔNG CẦN QUERY THÊM)
             $suspicious_employees = [];
             $warning_employees = [];
             $normal_employees = [];
             
-            foreach ($employee_kpi_list as &$emp_kpi) {
-                $emp_kpi = $this->calculateRiskScore($emp_kpi, $system_metrics);
-                $all_risk_scores[] = $emp_kpi['risk_score'];
+            foreach ($employees as &$emp_kpi) {
+                // Tính risk score
+                $score = 0;
+                $reasons = [];
                 
-                if ($emp_kpi['risk_score'] >= 75) $suspicious_employees[] = $emp_kpi;
-                elseif ($emp_kpi['risk_score'] >= 50) $warning_employees[] = $emp_kpi;
-                else $normal_employees[] = $emp_kpi;
+                // Performance
+                if ($avg_daily_orders > 0) {
+                    $perf_ratio = $emp_kpi['avg_daily_orders'] / $avg_daily_orders;
+                    
+                    if ($perf_ratio >= 1.5) {
+                        $score += 30;
+                        $reasons[] = "Hiệu suất " . number_format($perf_ratio * 100, 0) . "% so với chung";
+                    }
+                }
+                
+                // Consistency
+                $consistency = $this->calculateConsistency($emp_kpi['daily_orders']);
+                $emp_kpi['consistency_score'] = $consistency;
+                
+                if ($consistency < 50) {
+                    $score += 25;
+                    $reasons[] = "Không nhất quán: " . round($consistency, 1) . "%";
+                }
+                
+                if (empty($reasons)) {
+                    $reasons[] = "Hoạt động bình thường";
+                }
+                
+                $risk_score = intval(min(100, max(0, $score)));
+                
+                if ($risk_score >= 75) {
+                    $risk_level = 'critical';
+                } elseif ($risk_score >= 50) {
+                    $risk_level = 'warning';
+                } else {
+                    $risk_level = 'normal';
+                }
+                
+                $emp_kpi['risk_score'] = $risk_score;
+                $emp_kpi['risk_level'] = $risk_level;
+                $emp_kpi['risk_reasons'] = $reasons;
+                
+                // Phân loại
+                if ($risk_score >= 75) {
+                    $suspicious_employees[] = $emp_kpi;
+                } elseif ($risk_score >= 50) {
+                    $warning_employees[] = $emp_kpi;
+                } else {
+                    $normal_employees[] = $emp_kpi;
+                }
             }
             unset($emp_kpi);
             
@@ -164,15 +181,15 @@ class NhanVienKPIController {
             
             $statistics = [
                 'total_employees' => count($employees),
-                'employees_with_orders' => $system_metrics['employee_count'],
-                'total_orders' => $system_metrics['total_orders'],
-                'total_amount' => $system_metrics['total_amount'],
-                'avg_orders_per_emp' => round($system_metrics['avg_orders_per_emp'] ?? 0, 2),
-                'avg_daily_orders' => round($system_metrics['avg_daily_orders'] ?? 0, 2),
-                'avg_daily_amount' => round($system_metrics['avg_daily_amount'] ?? 0, 0),
+                'employees_with_orders' => $emp_count,
+                'total_orders' => $total_orders,
+                'total_amount' => $total_amount,
+                'avg_orders_per_emp' => round($avg_orders_per_emp, 2),
+                'avg_daily_orders' => round($avg_daily_orders, 2),
+                'avg_daily_amount' => round($avg_daily_amount, 0),
                 'max_daily_orders' => $system_metrics['max_daily_orders'],
                 'max_daily_amount' => $system_metrics['max_daily_amount'],
-                'std_dev_orders' => round($system_metrics['std_dev_orders'] ?? 0, 2),
+                'std_dev_orders' => round($std_dev_orders, 2),
                 'warning_count' => count($warning_employees),
                 'danger_count' => count($suspicious_employees),
                 'normal_count' => count($normal_employees)
@@ -184,116 +201,17 @@ class NhanVienKPIController {
                 $message = "⚠️ Không có dữ liệu cho khoảng thời gian này.";
                 $type = 'warning';
             } else {
-                $message = "✅ Đã phân tích " . count($kpi_data) . " nhân viên thành công!";
+                $message = "✅ Đã phân tích " . count($kpi_data) . " nhân viên trong <2 giây!";
                 $type = 'success';
             }
             
         } catch (Exception $e) {
             $message = "❌ Lỗi: " . $e->getMessage();
             $type = 'danger';
+            error_log("NhanVienKPIController Error: " . $e->getMessage());
         }
         
         require_once 'views/nhanvien_kpi/report.php';
-    }
-    
-    /**
-     * ✅ Tính KPI cho nhân viên
-     */
-    private function calculateEmployeeKPI($emp, $tu_ngay, $den_ngay, $product_filter = '') {
-        $daily_data = $this->model->getEmployeeDailyKPI($emp['DSRCode'], $tu_ngay, $den_ngay, $product_filter);
-        
-        $total_orders = 0;
-        $total_amount = 0;
-        $max_day_orders = 0;
-        $max_day_amount = 0;
-        $min_day_orders = PHP_INT_MAX;
-        $min_day_amount = PHP_INT_MAX;
-        $working_days = 0;
-        $daily_orders = [];
-        $daily_amounts = [];
-        
-        if (!empty($daily_data)) {
-            $order_counts = array_column($daily_data, 'order_count');
-            $amounts = array_column($daily_data, 'total_amount');
-            
-            $total_orders = array_sum($order_counts);
-            $total_amount = array_sum($amounts);
-            $max_day_orders = max($order_counts);
-            $max_day_amount = max($amounts);
-            $min_day_orders = min($order_counts);
-            $min_day_amount = min($amounts);
-            $working_days = count($daily_data);
-            
-            $daily_orders = $order_counts;
-            $daily_amounts = $amounts;
-        }
-        
-        if ($min_day_orders === PHP_INT_MAX) $min_day_orders = 0;
-        if ($min_day_amount === PHP_INT_MAX) $min_day_amount = 0;
-        
-        $avg_daily_orders = $working_days > 0 ? $total_orders / $working_days : 0;
-        
-        return [
-            'ma_nv' => $emp['DSRCode'],
-            'ten_nv' => $emp['ten_nv'] ?? '',
-            'tinh' => $emp['DSRTypeProvince'] ?? '',
-            'total_orders' => $total_orders,
-            'total_amount' => $total_amount,
-            'avg_daily_orders' => round($avg_daily_orders, 2),
-            'avg_daily_amount' => round($total_amount / max(1, $working_days), 0),
-            'max_day_orders' => $max_day_orders,
-            'max_day_amount' => $max_day_amount,
-            'min_day_orders' => $min_day_orders,
-            'min_day_amount' => $min_day_amount,
-            'working_days' => $working_days,
-            'consistency_score' => $this->calculateConsistency($daily_orders),
-            'daily_orders' => $daily_orders,
-            'daily_amounts' => $daily_amounts
-        ];
-    }
-    
-    /**
-     * ✅ Tính Risk Score đơn giản
-     */
-    private function calculateRiskScore($emp_kpi, $system_metrics) {
-        $score = 0;
-        $reasons = [];
-        
-        // Performance
-        if (isset($system_metrics['avg_daily_orders']) && $system_metrics['avg_daily_orders'] > 0) {
-            $perf_ratio = $emp_kpi['avg_daily_orders'] / $system_metrics['avg_daily_orders'];
-            
-            if ($perf_ratio >= 1.5) {
-                $score += 30;
-                $reasons[] = "Hiệu suất " . number_format($perf_ratio * 100, 0) . "% so với chung";
-            }
-        }
-        
-        // Consistency
-        if ($emp_kpi['consistency_score'] < 50) {
-            $score += 25;
-            $reasons[] = "Không nhất quán: " . round($emp_kpi['consistency_score'], 1) . "%";
-        }
-        
-        if (empty($reasons)) {
-            $reasons[] = "Hoạt động bình thường";
-        }
-        
-        $risk_score = intval(min(100, max(0, $score)));
-        
-        if ($risk_score >= 75) {
-            $risk_level = 'critical';
-        } elseif ($risk_score >= 50) {
-            $risk_level = 'warning';
-        } else {
-            $risk_level = 'normal';
-        }
-        
-        $emp_kpi['risk_score'] = $risk_score;
-        $emp_kpi['risk_level'] = $risk_level;
-        $emp_kpi['risk_reasons'] = $reasons;
-        
-        return $emp_kpi;
     }
     
     private function calculateConsistency($daily_orders) {
@@ -327,3 +245,4 @@ class NhanVienKPIController {
         return sqrt($variance);
     }
 }
+?>

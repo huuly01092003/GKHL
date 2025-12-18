@@ -1,6 +1,7 @@
 <?php
 /**
- * ✅ MODEL: BÁO CÁO DOANH SỐ NHÂN VIÊN - Fixed cho DSVGKHL
+ * ✅ MODEL TỐI ƯU - Báo Cáo Doanh Số Nhân Viên
+ * Thay vì loop từng nhân viên → Query 1 lần cho TẤT CẢ
  */
 
 require_once 'config/database.php';
@@ -14,336 +15,226 @@ class NhanVienReportModel {
     }
 
     /**
-     * Lấy danh sách tháng có sẵn
+     * ✅ LẤY TẤT CẢ DỮ LIỆU NHÂN VIÊN 1 LẦN (FIX CHO MARIADB)
+     */
+    public function getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang) {
+        list($year, $month) = explode('-', $thang);
+        
+        $sql = "SELECT 
+                    o.DSRCode,
+                    o.DSRTypeProvince,
+                    
+                    -- TRONG KHOẢNG NGÀY
+                    SUM(CASE WHEN DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ? 
+                        THEN o.TotalNetAmount ELSE 0 END) as ds_tien_do,
+                    COUNT(DISTINCT CASE WHEN DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ? 
+                        THEN DATE(o.OrderDate) END) as so_ngay_co_doanh_so_khoang,
+                    COALESCE(MAX(ds_khoang.max_daily), 0) as ds_ngay_cao_nhat_nv_khoang,
+                    
+                    -- TRONG THÁNG
+                    SUM(CASE WHEN o.RptYear = ? AND o.RptMonth = ? 
+                        THEN o.TotalNetAmount ELSE 0 END) as ds_tong_thang_nv,
+                    COUNT(DISTINCT CASE WHEN o.RptYear = ? AND o.RptMonth = ? 
+                        THEN DATE(o.OrderDate) END) as so_ngay_co_doanh_so_thang,
+                    COALESCE(MAX(ds_thang.max_daily), 0) as ds_ngay_cao_nhat_nv_thang
+                    
+                FROM orderdetail o
+                
+                -- LEFT JOIN để lấy max daily cho KHOẢNG
+                LEFT JOIN (
+                    SELECT 
+                        DSRCode,
+                        MAX(daily_amount) as max_daily
+                    FROM (
+                        SELECT 
+                            DSRCode,
+                            DATE(OrderDate) as order_date,
+                            SUM(TotalNetAmount) as daily_amount
+                        FROM orderdetail
+                        WHERE DSRCode IS NOT NULL 
+                        AND DSRCode != ''
+                        AND DATE(OrderDate) >= ?
+                        AND DATE(OrderDate) <= ?
+                        GROUP BY DSRCode, DATE(OrderDate)
+                    ) daily_khoang
+                    GROUP BY DSRCode
+                ) ds_khoang ON o.DSRCode = ds_khoang.DSRCode
+                
+                -- LEFT JOIN để lấy max daily cho THÁNG
+                LEFT JOIN (
+                    SELECT 
+                        DSRCode,
+                        MAX(daily_amount) as max_daily
+                    FROM (
+                        SELECT 
+                            DSRCode,
+                            DATE(OrderDate) as order_date,
+                            SUM(TotalNetAmount) as daily_amount
+                        FROM orderdetail
+                        WHERE DSRCode IS NOT NULL 
+                        AND DSRCode != ''
+                        AND RptYear = ?
+                        AND RptMonth = ?
+                        GROUP BY DSRCode, DATE(OrderDate)
+                    ) daily_thang
+                    GROUP BY DSRCode
+                ) ds_thang ON o.DSRCode = ds_thang.DSRCode
+                
+                WHERE o.DSRCode IS NOT NULL 
+                AND o.DSRCode != ''
+                AND (
+                    (DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ?)
+                    OR (o.RptYear = ? AND o.RptMonth = ?)
+                )
+                GROUP BY o.DSRCode, o.DSRTypeProvince
+                HAVING ds_tien_do > 0 OR ds_tong_thang_nv > 0
+                ORDER BY o.DSRCode";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            // KHOẢNG NGÀY trong SELECT (4 lần)
+            $tu_ngay, $den_ngay,
+            $tu_ngay, $den_ngay,
+            
+            // THÁNG trong SELECT (4 lần)
+            $year, $month,
+            $year, $month,
+            
+            // LEFT JOIN KHOẢNG (2 lần)
+            $tu_ngay, $den_ngay,
+            
+            // LEFT JOIN THÁNG (2 lần)
+            $year, $month,
+            
+            // WHERE clause (4 lần)
+            $tu_ngay, $den_ngay,
+            $year, $month
+        ]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * ✅ TỔNG THEO THÁNG - 1 QUERY DUY NHẤT (FIX AMBIGUOUS)
+     */
+    public function getSystemStatsForMonth($thang) {
+        list($year, $month) = explode('-', $thang);
+        
+        $sql = "SELECT 
+                    COALESCE(SUM(o.TotalNetAmount), 0) as total,
+                    COUNT(DISTINCT o.DSRCode) as emp_count,
+                    DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))) as so_ngay,
+                    
+                    -- DS TB/Ngày/Nhân viên
+                    COALESCE(SUM(o.TotalNetAmount), 0) / 
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))), 0) as ds_tb_chung_thang,
+                    
+                    -- DS Ngày Cao Nhất TB
+                    AVG(emp_max.max_daily) as ds_ngay_cao_nhat_tb_thang
+                    
+                FROM orderdetail o
+                LEFT JOIN (
+                    SELECT 
+                        DSRCode, 
+                        MAX(daily_total) as max_daily
+                    FROM (
+                        SELECT 
+                            DSRCode, 
+                            DATE(OrderDate) as order_date,
+                            SUM(TotalNetAmount) as daily_total
+                        FROM orderdetail
+                        WHERE RptYear = ? AND RptMonth = ?
+                        AND DSRCode IS NOT NULL AND DSRCode != ''
+                        GROUP BY DSRCode, DATE(OrderDate)
+                    ) daily
+                    GROUP BY DSRCode
+                ) emp_max ON o.DSRCode = emp_max.DSRCode
+                WHERE o.RptYear = ? AND o.RptMonth = ?
+                AND o.DSRCode IS NOT NULL AND o.DSRCode != ''";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([$year, $month, $year, $month, $year, $month, $year, $month]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * ✅ TỔNG THEO KHOẢNG - 1 QUERY DUY NHẤT (FIX AMBIGUOUS)
+     */
+    public function getSystemStatsForRange($tu_ngay, $den_ngay) {
+        $sql = "SELECT 
+                    COALESCE(SUM(o.TotalNetAmount), 0) as total,
+                    COUNT(DISTINCT o.DSRCode) as emp_count,
+                    DATEDIFF(?, ?) + 1 as so_ngay,
+                    
+                    -- DS TB/Ngày/Nhân viên
+                    COALESCE(SUM(o.TotalNetAmount), 0) / 
+                    NULLIF(COUNT(DISTINCT o.DSRCode) * (DATEDIFF(?, ?) + 1), 0) as ds_tb_chung_khoang,
+                    
+                    -- DS Ngày Cao Nhất TB
+                    AVG(emp_max.max_daily) as ds_ngay_cao_nhat_tb_khoang
+                    
+                FROM orderdetail o
+                LEFT JOIN (
+                    SELECT 
+                        DSRCode, 
+                        MAX(daily_total) as max_daily
+                    FROM (
+                        SELECT 
+                            DSRCode, 
+                            DATE(OrderDate) as order_date,
+                            SUM(TotalNetAmount) as daily_total
+                        FROM orderdetail
+                        WHERE DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?
+                        AND DSRCode IS NOT NULL AND DSRCode != ''
+                        GROUP BY DSRCode, DATE(OrderDate)
+                    ) daily
+                    GROUP BY DSRCode
+                ) emp_max ON o.DSRCode = emp_max.DSRCode
+                WHERE DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ?
+                AND o.DSRCode IS NOT NULL AND o.DSRCode != ''";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            $den_ngay, $tu_ngay,
+            $den_ngay, $tu_ngay,
+            $tu_ngay, $den_ngay,
+            $tu_ngay, $den_ngay
+        ]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * ✅ CÁC HÀM CŨ GIỮ LẠI ĐỂ TƯƠNG THÍCH
      */
     public function getAvailableMonths() {
-        try {
-            $sql = "SELECT DISTINCT CONCAT(RptYear, '-', LPAD(RptMonth, 2, '0')) as thang
-                    FROM orderdetail
-                    WHERE RptYear IS NOT NULL AND RptMonth IS NOT NULL
-                    AND RptYear >= 2020
-                    ORDER BY RptYear DESC, RptMonth DESC
-                    LIMIT 24";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-        } catch (Exception $e) {
-            error_log("getAvailableMonths error: " . $e->getMessage());
-            return [];
-        }
+        $sql = "SELECT DISTINCT CONCAT(RptYear, '-', LPAD(RptMonth, 2, '0')) as thang
+                FROM orderdetail
+                WHERE RptYear IS NOT NULL AND RptMonth IS NOT NULL
+                AND RptYear >= 2020
+                ORDER BY RptYear DESC, RptMonth DESC
+                LIMIT 24";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
-    /**
-     * Tổng doanh số theo tháng (RptYear-RptMonth)
-     */
+    // Deprecated - Không dùng nữa
     public function getTotalByMonth($thang) {
-        try {
-            list($year, $month) = explode('-', $thang);
-            
-            $sql = "SELECT COALESCE(SUM(TotalNetAmount), 0) as total
-                    FROM orderdetail
-                    WHERE RptYear = ? AND RptMonth = ?";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$year, $month]);
-            return floatval($stmt->fetch()['total'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getTotalByMonth error: " . $e->getMessage());
-            return 0;
-        }
+        list($year, $month) = explode('-', $thang);
+        $sql = "SELECT COALESCE(SUM(TotalNetAmount), 0) as total
+                FROM orderdetail WHERE RptYear = ? AND RptMonth = ?";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([$year, $month]);
+        return floatval($stmt->fetch()['total'] ?? 0);
     }
 
-    /**
-     * Tổng doanh số theo khoảng ngày (OrderDate)
-     */
     public function getTotalByDateRange($tu_ngay, $den_ngay) {
-        try {
-            $sql = "SELECT COALESCE(SUM(TotalNetAmount), 0) as total
-                    FROM orderdetail
-                    WHERE DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$tu_ngay, $den_ngay]);
-            return floatval($stmt->fetch()['total'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getTotalByDateRange error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Doanh số nhân viên theo tháng
-     */
-    public function getEmployeeTotalByMonth($dsr_code, $thang) {
-        try {
-            list($year, $month) = explode('-', $thang);
-            
-            $sql = "SELECT COALESCE(SUM(TotalNetAmount), 0) as total
-                    FROM orderdetail
-                    WHERE DSRCode = ? AND RptYear = ? AND RptMonth = ?";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$dsr_code, $year, $month]);
-            return floatval($stmt->fetch()['total'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getEmployeeTotalByMonth error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Doanh số nhân viên theo khoảng ngày
-     */
-    public function getEmployeeTotalByDateRange($dsr_code, $tu_ngay, $den_ngay) {
-        try {
-            $sql = "SELECT COALESCE(SUM(TotalNetAmount), 0) as total
-                    FROM orderdetail
-                    WHERE DSRCode = ?
-                    AND DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$dsr_code, $tu_ngay, $den_ngay]);
-            return floatval($stmt->fetch()['total'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getEmployeeTotalByDateRange error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Số ngày có doanh số
-     */
-    public function getEmployeeDaysWithOrders($dsr_code, $tu_ngay, $den_ngay) {
-        try {
-            $sql = "SELECT COUNT(DISTINCT DATE(OrderDate)) as days_count
-                    FROM orderdetail
-                    WHERE DSRCode = ?
-                    AND DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$dsr_code, $tu_ngay, $den_ngay]);
-            return intval($stmt->fetch()['days_count'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getEmployeeDaysWithOrders error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Doanh số ngày cao nhất (khoảng)
-     */
-    public function getMaxDailyAmountByDateRange($dsr_code, $tu_ngay, $den_ngay) {
-        try {
-            $sql = "SELECT MAX(daily_total) as max_daily
-                    FROM (
-                        SELECT SUM(TotalNetAmount) as daily_total
-                        FROM orderdetail
-                        WHERE DSRCode = ?
-                        AND DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?
-                        GROUP BY DATE(OrderDate)
-                    ) daily_stats";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$dsr_code, $tu_ngay, $den_ngay]);
-            return floatval($stmt->fetch()['max_daily'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getMaxDailyAmountByDateRange error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Doanh số ngày cao nhất (tháng)
-     */
-    public function getMaxDailyAmountByMonth($dsr_code, $thang) {
-        try {
-            list($year, $month) = explode('-', $thang);
-            
-            $sql = "SELECT MAX(daily_total) as max_daily
-                    FROM (
-                        SELECT SUM(TotalNetAmount) as daily_total
-                        FROM orderdetail
-                        WHERE DSRCode = ? AND RptYear = ? AND RptMonth = ?
-                        GROUP BY DATE(OrderDate)
-                    ) daily_stats";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$dsr_code, $year, $month]);
-            return floatval($stmt->fetch()['max_daily'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getMaxDailyAmountByMonth error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Số nhân viên trong khoảng
-     */
-    public function getEmployeeCountInRange($tu_ngay, $den_ngay) {
-        try {
-            $sql = "SELECT COUNT(DISTINCT DSRCode) as emp_count
-                    FROM orderdetail
-                    WHERE DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?
-                    AND DSRCode IS NOT NULL AND DSRCode != ''";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$tu_ngay, $den_ngay]);
-            return intval($stmt->fetch()['emp_count'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getEmployeeCountInRange error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Số nhân viên trong tháng
-     */
-    public function getEmployeeCountInMonth($thang) {
-        try {
-            list($year, $month) = explode('-', $thang);
-            
-            $sql = "SELECT COUNT(DISTINCT DSRCode) as emp_count
-                    FROM orderdetail
-                    WHERE RptYear = ? AND RptMonth = ?
-                    AND DSRCode IS NOT NULL AND DSRCode != ''";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$year, $month]);
-            return intval($stmt->fetch()['emp_count'] ?? 0);
-        } catch (Exception $e) {
-            error_log("getEmployeeCountInMonth error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Trung bình doanh số/ngày/nhân viên (khoảng)
-     */
-    public function getSystemRangeAveragePerDay($tu_ngay, $den_ngay) {
-        try {
-            $total = $this->getTotalByDateRange($tu_ngay, $den_ngay);
-            $emp_count = $this->getEmployeeCountInRange($tu_ngay, $den_ngay);
-            
-            $ngay_diff = intval((strtotime($den_ngay) - strtotime($tu_ngay)) / 86400);
-            $so_ngay = max(1, $ngay_diff + 1);
-            
-            if ($emp_count > 0 && $so_ngay > 0) {
-                return floatval($total / $so_ngay / $emp_count);
-            }
-            return 0;
-        } catch (Exception $e) {
-            error_log("getSystemRangeAveragePerDay error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Trung bình doanh số/ngày/nhân viên (tháng)
-     */
-    public function getSystemMonthlyAveragePerDay($thang) {
-        try {
-            $total = $this->getTotalByMonth($thang);
-            $emp_count = $this->getEmployeeCountInMonth($thang);
-            
-            $so_ngay = intval(date('t', strtotime($thang . '-01')));
-            
-            if ($emp_count > 0 && $so_ngay > 0) {
-                return floatval($total / $so_ngay / $emp_count);
-            }
-            return 0;
-        } catch (Exception $e) {
-            error_log("getSystemMonthlyAveragePerDay error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * TB doanh số ngày cao nhất/nhân viên (khoảng)
-     */
-    public function getSystemMaxDailyAveragePerEmployee($tu_ngay, $den_ngay) {
-        try {
-            $sql = "SELECT SUM(max_daily) as total_max, COUNT(*) as emp_count
-                    FROM (
-                        SELECT MAX(daily_total) as max_daily
-                        FROM (
-                            SELECT SUM(TotalNetAmount) as daily_total
-                            FROM orderdetail
-                            WHERE DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?
-                            AND DSRCode IS NOT NULL AND DSRCode != ''
-                            GROUP BY DSRCode, DATE(OrderDate)
-                        ) daily_by_emp
-                        GROUP BY DSRCode
-                    ) emp_max";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$tu_ngay, $den_ngay]);
-            $result = $stmt->fetch();
-            
-            $total_max = floatval($result['total_max'] ?? 0);
-            $emp_count = intval($result['emp_count'] ?? 0);
-            
-            return ($emp_count > 0) ? ($total_max / $emp_count) : 0;
-        } catch (Exception $e) {
-            error_log("getSystemMaxDailyAveragePerEmployee error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * TB doanh số ngày cao nhất/nhân viên (tháng)
-     */
-    public function getSystemMaxDailyAveragePerEmployeeByMonth($thang) {
-        try {
-            list($year, $month) = explode('-', $thang);
-            
-            $sql = "SELECT SUM(max_daily) as total_max, COUNT(*) as emp_count
-                    FROM (
-                        SELECT MAX(daily_total) as max_daily
-                        FROM (
-                            SELECT SUM(TotalNetAmount) as daily_total
-                            FROM orderdetail
-                            WHERE RptYear = ? AND RptMonth = ?
-                            AND DSRCode IS NOT NULL AND DSRCode != ''
-                            GROUP BY DSRCode, DATE(OrderDate)
-                        ) daily_by_emp
-                        GROUP BY DSRCode
-                    ) emp_max";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$year, $month]);
-            $result = $stmt->fetch();
-            
-            $total_max = floatval($result['total_max'] ?? 0);
-            $emp_count = intval($result['emp_count'] ?? 0);
-            
-            return ($emp_count > 0) ? ($total_max / $emp_count) : 0;
-        } catch (Exception $e) {
-            error_log("getSystemMaxDailyAveragePerEmployeeByMonth error: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Lấy danh sách nhân viên (DSRCode duy nhất)
-     */
-    public function getAllEmployees() {
-        try {
-            $sql = "SELECT DISTINCT 
-                        o.DSRCode,
-                        o.DSRTypeProvince,
-                        CONCAT('NV_', o.DSRCode) as ten_nv
-                    FROM orderdetail o
-                    WHERE o.DSRCode IS NOT NULL 
-                    AND o.DSRCode != ''
-                    ORDER BY o.DSRCode";
-            
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {
-            error_log("getAllEmployees error: " . $e->getMessage());
-            return [];
-        }
+        $sql = "SELECT COALESCE(SUM(TotalNetAmount), 0) as total
+                FROM orderdetail WHERE DATE(OrderDate) >= ? AND DATE(OrderDate) <= ?";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([$tu_ngay, $den_ngay]);
+        return floatval($stmt->fetch()['total'] ?? 0);
     }
 }
+?>
