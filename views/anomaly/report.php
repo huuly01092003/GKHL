@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚨 Phát hiện Khách hàng Bất thường</title>
+    <title>Phát hiện Khách hàng Bất thường</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -162,7 +162,7 @@
     <div class="container-fluid mt-4">
         <div class="warning-header">
             <h5 class="mb-2">
-                <i class="fas fa-shield-alt me-2"></i><strong>Hệ thống Phát hiện Hành vi Bất thường</strong>
+                <i class="fas fa-shield-alt me-2"></i><strong>Phát hiện hành vi bất thường của khách hàng</strong>
             </h5>
             <p class="mb-0">
                 Phân tích 15 chỉ số bất thường để phát hiện khách hàng có hành vi đáng ngờ. 

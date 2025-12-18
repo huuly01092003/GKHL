@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Báo Cáo Kiểm Soát Gian Lận - Doanh Số Nhân Viên</title>
+    <title>Báo Cáo Kiểm Soát - Doanh Số Nhân Viên</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -33,7 +33,7 @@
 <div class="container-fluid">
     <div class="card mt-4 mb-4">
         <div class="card-header">
-            <h2><i class="fas fa-chart-bar"></i> KIỂM SOÁT GIAN LẬN NHÂN VIÊN</h2>
+            <h2><i class="fas fa-chart-bar"></i> KIỂM SOÁT DOANH SỐ NHÂN VIÊN</h2>
         </div>
         
         <div class="card-body">
