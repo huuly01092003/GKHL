@@ -1752,6 +1752,49 @@ function showAnomalyDetailModal(data) {
     }
 }
 
+function renderEvidence(evidence) {
+    if (!evidence || evidence.length === 0) {
+        return '<tr><td colspan="5" class="text-center text-muted">Không có dữ liệu</td></tr>';
+    }
+    
+    return evidence.map(row => {
+        // ✅ Display actual order and staff data
+        let detailHTML = `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;">${row.period}</td>
+                <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                <td style="padding: 10px;">${row.comparison}</td>
+        `;
+        
+        // ✅ NEW: Show order details if available
+        if (row.orders && row.orders.length > 0) {
+            detailHTML += `
+                <td style="padding: 10px;">
+                    <div class="small text-muted">
+                        <strong>Đơn hàng:</strong> ${row.orders.slice(0, 3).join(', ')}
+                        ${row.orders.length > 3 ? ` (+${row.orders.length - 3} đơn khác)` : ''}
+                    </div>
+            `;
+            
+            // ✅ Show staff info if available
+            if (row.staff_names && row.staff_names.length > 0) {
+                detailHTML += `
+                    <div class="small text-muted mt-1">
+                        <strong>NV:</strong> ${row.staff_codes[0] || 'N/A'} - ${row.staff_names[0] || 'N/A'}
+                    </div>
+                `;
+            }
+            
+            detailHTML += `</td>`;
+        } else {
+            detailHTML += `<td style="padding: 10px;"><span class="text-muted">Không có chi tiết</span></td>`;
+        }
+        
+        detailHTML += `</tr>`;
+        return detailHTML;
+    }).join('');
+}
+
 /**
  * ========================================
  * CONSOLE HELPER

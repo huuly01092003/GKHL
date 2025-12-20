@@ -328,46 +328,55 @@ class AnomalyDetectionModel {
      * 1️⃣ Dữ liệu từng tháng (cho Sudden Spike)
      */
     private function getMonthlyBreakdown($custCode, $years, $months) {
-        $minYear = min($years);
-        $minMonth = min($months);
+    $minYear = min($years);
+    $minMonth = min($months);
+    
+    $sql = "SELECT 
+                o.RptYear,
+                o.RptMonth,
+                SUM(o.TotalNetAmount) as monthly_sales,
+                COUNT(DISTINCT o.OrderNumber) as monthly_orders,
+                GROUP_CONCAT(DISTINCT o.OrderNumber ORDER BY o.OrderDate SEPARATOR ', ') as order_codes,
+                GROUP_CONCAT(DISTINCT o.DSRCode ORDER BY o.OrderDate SEPARATOR ', ') as staff_codes,
+                GROUP_CONCAT(DISTINCT d.TenNVBH ORDER BY o.OrderDate SEPARATOR ', ') as staff_names
+            FROM orderdetail o
+            LEFT JOIN dskh d ON o.DSRCode = d.MaNVBH
+            WHERE o.CustCode = ?
+            AND (
+                (o.RptYear = ? AND o.RptMonth <= ?)
+                OR (o.RptYear = ? - 1 AND o.RptMonth > ?)
+            )
+            GROUP BY o.RptYear, o.RptMonth
+            ORDER BY o.RptYear, o.RptMonth
+            LIMIT 6";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$custCode, $minYear, $minMonth, $minYear, $minMonth]);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    if (empty($results)) return [];
+    
+    $baseline = $results[0]['monthly_sales'] ?? 0;
+    
+    foreach ($results as &$row) {
+        $row['period'] = "Tháng {$row['RptMonth']}/{$row['RptYear']}";
+        $row['value'] = number_format($row['monthly_sales'], 0, ',', '.');
         
-        $sql = "SELECT 
-                    RptYear,
-                    RptMonth,
-                    SUM(TotalNetAmount) as monthly_sales,
-                    COUNT(DISTINCT OrderNumber) as monthly_orders
-                FROM orderdetail
-                WHERE CustCode = ?
-                AND (
-                    (RptYear = ? AND RptMonth <= ?)
-                    OR (RptYear = ? - 1 AND RptMonth > ?)
-                )
-                GROUP BY RptYear, RptMonth
-                ORDER BY RptYear, RptMonth
-                LIMIT 6";
+        // ✅ NEW: Add enriched data
+        $row['orders'] = array_filter(explode(', ', $row['order_codes'] ?? ''));
+        $row['staff_codes'] = array_filter(explode(', ', $row['staff_codes'] ?? ''));
+        $row['staff_names'] = array_filter(explode(', ', $row['staff_names'] ?? ''));
         
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute([$custCode, $minYear, $minMonth, $minYear, $minMonth]);
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (empty($results)) return [];
-        
-        $baseline = $results[0]['monthly_sales'] ?? 0;
-        
-        foreach ($results as &$row) {
-            $row['period'] = "Tháng {$row['RptMonth']}/{$row['RptYear']}";
-            $row['value'] = number_format($row['monthly_sales'], 0, ',', '.');
-            
-            if ($baseline > 0 && $row['monthly_sales'] != $baseline) {
-                $change = (($row['monthly_sales'] - $baseline) / $baseline) * 100;
-                $row['comparison'] = ($change >= 0 ? '+' : '') . round($change, 1) . '%';
-            } else {
-                $row['comparison'] = 'Baseline';
-            }
+        if ($baseline > 0 && $row['monthly_sales'] != $baseline) {
+            $change = (($row['monthly_sales'] - $baseline) / $baseline) * 100;
+            $row['comparison'] = ($change >= 0 ? '+' : '') . round($change, 1) . '%';
+        } else {
+            $row['comparison'] = 'Baseline';
         }
-        
-        return $results;
     }
+    
+    return $results;
+}
 
     /**
      * 2️⃣ Lịch sử giao dịch với khoảng trống (Return After Long Break)
@@ -1221,4 +1230,36 @@ class AnomalyDetectionModel {
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+ * ✅ NEW METHOD: Get enriched evidence with order and employee details
+ */
+public function getEnrichedEvidenceDetail($custCode, $years, $months, $evidenceType) {
+    $yearPlaceholders = implode(',', array_fill(0, count($years), '?'));
+    $monthPlaceholders = implode(',', array_fill(0, count($months), '?'));
+    
+    $sql = "SELECT 
+                o.OrderNumber as order_code,
+                o.OrderDate,
+                o.CustCode,
+                o.TotalNetAmount,
+                o.DSRCode as staff_code,
+                d.TenNVBH as staff_name,
+                d.MaGSBH as supervisor_code,
+                DATE(o.OrderDate) as order_date,
+                o.RptMonth,
+                o.RptYear
+            FROM orderdetail o
+            LEFT JOIN dskh d ON o.DSRCode = d.MaNVBH
+            WHERE o.CustCode = ?
+            AND o.RptYear IN ($yearPlaceholders)
+            AND o.RptMonth IN ($monthPlaceholders)
+            ORDER BY o.OrderDate DESC";
+    
+    $params = array_merge([$custCode], $years, $months);
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute($params);
+    
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 }
