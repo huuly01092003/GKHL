@@ -1262,4 +1262,6 @@ public function getEnrichedEvidenceDetail($custCode, $years, $months, $evidenceT
     
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+
 }

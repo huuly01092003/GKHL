@@ -655,6 +655,7 @@
                                         <th style="padding: 10px; text-align: left; color: #333; font-weight: 600;">Kỳ Báo Cáo</th>
                                         <th style="padding: 10px; text-align: left; color: #333; font-weight: 600;">Giá Trị</th>
                                         <th style="padding: 10px; text-align: left; color: #333; font-weight: 600;">So Sánh</th>
+                                        <th style="padding: 10px; text-align: left; color: #333; font-weight: 600;">📦 Đơn Hàng / 👤 Nhân Viên</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -735,31 +736,79 @@
 
 <script>
 // Dữ liệu chi tiết cho từng dấu hiệu (dạng JSON từ PHP)
-const anomalyDetailsData = <?= json_encode([
-    'overview' => [
-        'explanation' => 'Doanh số tăng đột biến so với trung bình của 3 tháng trước là dấu hiệu đáng ngờ. Một khách hàng bình thường có hành vi mua hàng ổn định, nhưng sự tăng đột biến 275% có thể cho thấy: hoạt động chuẩn bị chương trình khuyến mãi, tích lũy hàng hóa, hoặc hành vi gian lận.',
-        'metrics' => [
-            ['label' => 'Doanh số kỳ này', 'value' => '45.5M', 'unit' => 'VNĐ'],
-            ['label' => 'TB 3 tháng trước', 'value' => '12.15M', 'unit' => 'VNĐ'],
-            ['label' => 'Mức tăng', 'value' => '+275%', 'unit' => ''],
-            ['label' => 'Chênh lệch', 'value' => '33.35M', 'unit' => 'VNĐ']
-        ]
-    ],
-    'evidence' => [
-        ['period' => 'Tháng 12/2025', 'value' => '45,500,000', 'comparison' => '+275%'],
-        ['period' => 'Tháng 11/2025', 'value' => '11,200,000', 'comparison' => '-8%'],
-        ['period' => 'Tháng 10/2025', 'value' => '13,100,000', 'comparison' => '+8%'],
-        ['period' => 'Tháng 09/2025', 'value' => '12,150,000', 'comparison' => 'Baseline']
-    ],
-    'formula' => 'Điểm gốc: 100/100 (vì tăng ≥300%) | Trọng số: 15% | Công thức: 100 × 15% = 15.0 điểm',
-    'actions' => [
-        '1. <strong>Liên hệ NVBH ngay (24 giờ):</strong> Xác minh lý do tăng đột biến',
-        '2. <strong>Kiểm tra chi tiết đơn hàng:</strong> Xem những đơn nào, ngày giờ nào',
-        '3. <strong>So sánh với khách hàng khác:</strong> Xem có riêng KH này tăng không',
-        '4. <strong>Rà soát trong 3 ngày:</strong> Lập danh sách tất cả giao dịch',
-        '5. <strong>Theo dõi tháng sau:</strong> Xem doanh số có giảm mạnh không'
-    ]
-]) ?>; 
+// ✅ DỮ LIỆU THẬT TỪ PHP - Không còn hardcode
+const anomalyDetailsFromPHP = <?= !empty($anomalyInfo) ? json_encode($anomalyInfo) : 'null' ?>;
+
+// Click handler cho anomaly list items
+document.querySelectorAll('.anomaly-list-item').forEach(item => {
+    item.addEventListener('click', function() {
+        const jsonData = this.dataset.anomalyJson;
+        if (!jsonData) {
+            console.error('Không có dữ liệu JSON');
+            return;
+        }
+        
+        try {
+            const anomalyDetail = JSON.parse(jsonData);
+            
+            // ✅ LẤY METRICS THẬT TỪ DETAIL
+            const metrics = anomalyDetail.metrics || {};
+            
+            // Update modal title
+            const config = anomalyConfig[anomalyDetail.type];
+            if (!config) {
+                console.error('Không tìm thấy config:', anomalyDetail.type);
+                return;
+            }
+            
+            document.getElementById('anomaly-explanation').textContent = config.getExplanation(metrics);
+            
+            // ✅ METRICS CARDS - DỮ LIỆU THẬT
+            const metricsDiv = document.getElementById('anomaly-metrics');
+            const metricCards = getMetricCards(anomalyDetail.type, metrics);
+            metricsDiv.innerHTML = metricCards.map(m => `
+                <div class="metric-card" style="${m.highlight ? 'border-left-color: ' + config.color + ';' : ''}">
+                    <div class="metric-label">${m.label}</div>
+                    <div class="metric-value" style="${m.highlight ? 'color: ' + config.color + ';' : ''}">
+                        ${m.value}<span class="metric-unit">${m.unit}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            // ✅ EVIDENCE TABLE - DỮ LIỆU THẬT TỪ DATABASE
+            const tableBody = document.querySelector('#anomaly-data-table tbody');
+            if (metrics.evidence && metrics.evidence.length > 0) {
+                tableBody.innerHTML = config.renderEvidence(metrics.evidence);
+            } else {
+                tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu minh chứng</td></tr>';
+            }
+            
+            // ✅ FORMULA
+            document.getElementById('anomaly-formula').innerHTML = getFormula(anomalyDetail.type, metrics);
+            
+            // ✅ ACTIONS
+            const actionsList = document.getElementById('anomaly-actions');
+            actionsList.innerHTML = getActions(anomalyDetail.type).map(a => `<li>${a}</li>`).join('');
+            
+            // ✅ UPDATE MODAL HEADER
+            document.getElementById('modalTitle').innerHTML = `${config.icon} ${config.title}`;
+            document.getElementById('modalSubtitle').textContent = 
+                `Chỉ số: ${anomalyDetail.type} | Trọng số: ${anomalyDetail.weight}% | Điểm: ${anomalyDetail.weighted_score.toFixed(1)}`;
+            
+            const modal = document.getElementById('anomalyDetailModal');
+            modal.querySelector('.modal-header').style.background = 
+                `linear-gradient(135deg, ${config.color} 0%, ${adjustColor(config.color, -20)} 100%)`;
+            
+            // Open modal
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+        } catch(e) {
+            console.error('Lỗi parse JSON:', e);
+            console.error('Data:', jsonData);
+        }
+    });
+});
 
 // Click handler cho anomaly list items
 document.querySelectorAll('.anomaly-list-item').forEach(item => {
@@ -970,43 +1019,79 @@ const anomalyConfig = {
             const increase = m.increase_percent || 0;
             const months = m.historical_months || 3;
             return `Khách hàng tăng doanh số ${increase}% so với trung bình ${months} tháng trước. ` +
-                   `Đây là dấu hiệu điển hình của việc tích lũy hàng hóa trước khi chốt chương trình, hoặc hành vi gian lận.`;
+                   `Đây là dấu hiệu điển hình của việc tích lũy hàng hóa trước khi chốt chương trình.`;
         },
         renderEvidence: (evidence) => {
             if (!evidence || evidence.length === 0) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
-            return evidence.map(row => `
+            
+            return evidence.map(row => {
+                // ✅ PARSE dữ liệu từ backend
+                const orders = row.orders || [];
+                const staffCodes = row.staff_codes || [];
+                const staffNames = row.staff_names || [];
+                
+                // Display orders
+                let orderDisplay = 'N/A';
+                if (orders.length > 0) {
+                    orderDisplay = orders.slice(0, 3).map(o => 
+                        `<code style="background: #e3f2fd; padding: 2px 6px; border-radius: 3px; margin: 2px; font-size: 0.8rem;">${o}</code>`
+                    ).join(' ');
+                    
+                    if (orders.length > 3) {
+                        orderDisplay += `<br><small class="text-muted">+${orders.length - 3} đơn nữa</small>`;
+                    }
+                }
+                
+                // Display employees (unique)
+                let employeeDisplay = 'N/A';
+                if (staffCodes.length > 0) {
+                    const uniqueEmployees = [];
+                    const seen = new Set();
+                    
+                    staffCodes.forEach((code, idx) => {
+                        if (!seen.has(code) && code !== 'N/A') {
+                            seen.add(code);
+                            uniqueEmployees.push({
+                                code: code,
+                                name: staffNames[idx] || 'N/A'
+                            });
+                        }
+                    });
+                    
+                    if (uniqueEmployees.length > 0) {
+                        employeeDisplay = uniqueEmployees.slice(0, 2).map(e => 
+                            `<div style="margin-bottom: 3px;">
+                                <span style="color: #667eea; font-weight: 500;">${e.code}</span>
+                                <br><small class="text-muted">${e.name}</small>
+                            </div>`
+                        ).join('');
+                        
+                        if (uniqueEmployees.length > 2) {
+                            employeeDisplay += `<small class="text-muted">+${uniqueEmployees.length - 2} NV khác</small>`;
+                        }
+                    }
+                }
+                
+                return `
                 <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 500;">${row.period}</td>
                     <td style="padding: 10px; font-weight: 600;">${row.value}</td>
                     <td style="padding: 10px;">${row.comparison}</td>
+                    <td style="padding: 10px; vertical-align: top;">
+                        <div style="margin-bottom: 5px;">
+                            <strong style="font-size: 0.75rem; color: #666;">📦 Đơn hàng:</strong><br>
+                            ${orderDisplay}
+                        </div>
+                        <div>
+                            <strong style="font-size: 0.75rem; color: #666;">👤 Nhân viên:</strong><br>
+                            ${employeeDisplay}
+                        </div>
+                    </td>
                 </tr>
-            `).join('');
-        }
-    },
-    
-    'return_after_long_break': {
-        icon: '↩️',
-        title: 'Quay Lại Sau Thời Gian Dài',
-        color: '#fd7e14',
-        getExplanation: (m) => {
-            const gap = m.months_gap || 0;
-            const increase = m.increase_percent || 0;
-            return `Khách hàng nghỉ mua hàng ${gap} tháng sau đó đột ngột quay lại và mua với số lượng lớn (${increase}% so với lần trước). ` +
-                   `Hành vi này rất bất thường và thường liên quan đến gian lận chương trình khuyến mãi.`;
-        },
-        renderEvidence: (evidence) => {
-            if (!evidence || evidence.length === 0) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu lịch sử</td></tr>';
-            }
-            return evidence.map(row => `
-                <tr style="border-bottom: 1px solid #eee; ${row.orders == 0 ? 'background: #fff3cd;' : ''}">
-                    <td style="padding: 10px;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;">${row.orders} đơn ${row.orders == 0 ? '⚠️ NGHỈ' : ''}</td>
-                </tr>
-            `).join('');
+                `;
+            }).join('');
         }
     },
     
@@ -1016,91 +1101,30 @@ const anomalyConfig = {
         color: '#ffc107',
         getExplanation: (m) => {
             const ratio = m.checkpoint_ratio || 0;
-            const mid = m.mid_checkpoint || 0;
-            const end = m.end_checkpoint || 0;
-            return `Khách hàng tập trung ${ratio}% đơn hàng vào 2 thời điểm: giữa tháng (12-14): ${mid} đơn và cuối tháng (26-28): ${end} đơn. ` +
-                   `Đây là thời điểm chốt số KPI của nhiều chương trình, rất dễ gian lận.`;
+            return `Khách hàng tập trung ${ratio}% đơn hàng vào thời điểm chốt số KPI.`;
         },
         renderEvidence: (evidence) => {
             if (!evidence || evidence.length === 0) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
+            
             return evidence.map(row => {
-                const isCheckpoint = row.comparison.includes('Giữa tháng') || row.comparison.includes('Cuối tháng');
+                const isCheckpoint = row.comparison && (
+                    row.comparison.includes('Giữa tháng') || 
+                    row.comparison.includes('Cuối tháng')
+                );
+                
                 return `
                 <tr style="border-bottom: 1px solid #eee; ${isCheckpoint ? 'background: #fff3cd;' : ''}">
                     <td style="padding: 10px;">${row.period}</td>
                     <td style="padding: 10px; font-weight: 600;">${row.value}</td>
                     <td style="padding: 10px;">${row.comparison} ${isCheckpoint ? '⚠️' : ''}</td>
+                    <td style="padding: 10px;">
+                        <small class="text-muted">${row.order_count || 0} đơn</small>
+                    </td>
                 </tr>
-            `}).join('');
-        }
-    },
-    
-    'product_concentration': {
-        icon: '📦',
-        title: 'Chỉ Mua 1 Loại Sản Phẩm',
-        color: '#e83e8c',
-        getExplanation: (m) => {
-            const types = m.distinct_types || 0;
-            const concentration = m.concentration_percent || 0;
-            const topType = m.top_product_type || 'N/A';
-            return `Khách hàng chỉ mua ${types} loại sản phẩm (${topType}) với tỷ lệ tập trung ${concentration}%. ` +
-                   `Khách hàng thực thường mua đa dạng, việc tập trung vào 1 sản phẩm có thể là tích lũy để đạt KPI.`;
-        },
-        renderEvidence: (evidence) => {
-            if (!evidence || evidence.length === 0) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
-            }
-            return evidence.map((row, idx) => `
-                <tr style="border-bottom: 1px solid #eee; ${idx === 0 ? 'background: #fff3cd;' : ''}">
-                    <td style="padding: 10px;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;">${row.comparison} ${idx === 0 ? '⚠️ CHỦ LỰC' : ''}</td>
-                </tr>
-            `).join('');
-        }
-    },
-    
-    'unusual_product_pattern': {
-        icon: '🔀',
-        title: 'Mua Sản Phẩm Khác Lạ',
-        color: '#6f42c1',
-        getExplanation: (m) => {
-            const newProducts = m.new_products || 0;
-            const newRatio = m.new_ratio || 0;
-            const types = m.new_product_types || 'N/A';
-            return `Khách hàng đột ngột mua ${newProducts} loại sản phẩm mới (${newRatio}%) khác lạ so với thói quen: ${types}. ` +
-                   `Hành vi thay đổi đột ngột thường liên quan đến gian lận hoặc thay đổi người mua.`;
-        },
-        renderEvidence: (evidence) => {
-            if (!evidence || !evidence.usual_products || !evidence.new_products) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu so sánh</td></tr>';
-            }
-            
-            let html = '<tr><td colspan="3" style="background: #e7f3ff; padding: 10px; font-weight: 600;">📌 Sản phẩm thường mua (12 tháng trước)</td></tr>';
-            evidence.usual_products.forEach(row => {
-                html += `
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 10px;">Loại SP: ${row.product_type}</td>
-                        <td style="padding: 10px;">${row.frequency} lần</td>
-                        <td style="padding: 10px;">${formatMoney(row.total_amount)}</td>
-                    </tr>
                 `;
-            });
-            
-            html += '<tr><td colspan="3" style="background: #fff3cd; padding: 10px; font-weight: 600;">⚠️ Sản phẩm mới (kỳ này)</td></tr>';
-            evidence.new_products.forEach(row => {
-                html += `
-                    <tr style="border-bottom: 1px solid #eee; background: #fffbf0;">
-                        <td style="padding: 10px;">${row.period}</td>
-                        <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                        <td style="padding: 10px;">${row.comparison}</td>
-                    </tr>
-                `;
-            });
-            
-            return html;
+            }).join('');
         }
     },
     
@@ -1111,23 +1135,112 @@ const anomalyConfig = {
         getExplanation: (m) => {
             const maxOrders = m.max_orders_in_day || 0;
             const maxDate = m.max_order_date || 'N/A';
-            const consecutive = m.max_consecutive_days || 0;
-            return `Khách hàng đặt ${maxOrders} đơn trong 1 ngày (${maxDate}) và mua liên tục ${consecutive} ngày. ` +
-                   `Hành vi bình thường là rải đều trong tháng, việc dồn dập là dấu hiệu gian lận rõ ràng.`;
+            return `Khách hàng đặt ${maxOrders} đơn trong 1 ngày (${maxDate}).`;
         },
         renderEvidence: (evidence) => {
             if (!evidence || evidence.length === 0) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
-            return evidence.map((row, idx) => {
-                const isHighVolume = parseInt(row.comparison) >= 5;
+            
+            return evidence.map(row => {
+                const orderCount = parseInt(row.comparison) || 0;
+                const isHighVolume = orderCount >= 5;
+                
                 return `
                 <tr style="border-bottom: 1px solid #eee; ${isHighVolume ? 'background: #fff3cd;' : ''}">
                     <td style="padding: 10px;">${row.period}</td>
                     <td style="padding: 10px; font-weight: 600;">${row.value}</td>
                     <td style="padding: 10px;">${row.comparison} ${isHighVolume ? '⚠️ DỒN DẬP' : ''}</td>
+                    <td style="padding: 10px;">
+                        <small class="text-muted">${orderCount} đơn</small>
+                    </td>
                 </tr>
-            `}).join('');
+                `;
+            }).join('');
+        }
+    },
+    
+    'product_concentration': {
+        icon: '📦',
+        title: 'Chỉ Mua 1 Loại Sản Phẩm',
+        color: '#e83e8c',
+        getExplanation: (m) => {
+            const types = m.distinct_types || 0;
+            const concentration = m.concentration_percent || 0;
+            return `Khách hàng chỉ mua ${types} loại sản phẩm với tỷ lệ tập trung ${concentration}%.`;
+        },
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map((row, idx) => `
+                <tr style="border-bottom: 1px solid #eee; ${idx === 0 ? 'background: #fff3cd;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;" colspan="2">${row.comparison} ${idx === 0 ? '⚠️ CHỦ LỰC' : ''}</td>
+                </tr>
+            `).join('');
+        }
+    },
+    
+    // ✅ Các loại khác - giữ nguyên logic tương tự
+    'return_after_long_break': {
+        icon: '↩️',
+        title: 'Quay Lại Sau Thời Gian Dài',
+        color: '#fd7e14',
+        getExplanation: (m) => {
+            const gap = m.months_gap || 0;
+            return `Khách hàng nghỉ mua ${gap} tháng sau đó đột ngột quay lại.`;
+        },
+        renderEvidence: (evidence) => {
+            if (!evidence || evidence.length === 0) {
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            return evidence.map(row => `
+                <tr style="border-bottom: 1px solid #eee; ${row.orders == 0 ? 'background: #fff3cd;' : ''}">
+                    <td style="padding: 10px;">${row.period}</td>
+                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                    <td style="padding: 10px;" colspan="2">${row.orders} đơn ${row.orders == 0 ? '⚠️ NGHỈ' : ''}</td>
+                </tr>
+            `).join('');
+        }
+    },
+    
+    'unusual_product_pattern': {
+        icon: '🔀',
+        title: 'Mua Sản Phẩm Khác Lạ',
+        color: '#6f42c1',
+        getExplanation: (m) => {
+            return `Khách hàng mua sản phẩm mới khác lạ so với thói quen.`;
+        },
+        renderEvidence: (evidence) => {
+            if (!evidence || !evidence.usual_products || !evidence.new_products) {
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
+            }
+            
+            let html = '<tr><td colspan="4" style="background: #e7f3ff; padding: 10px; font-weight: 600;">📌 Sản phẩm thường mua</td></tr>';
+            evidence.usual_products.forEach(row => {
+                html += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px;">Loại SP: ${row.product_type}</td>
+                        <td style="padding: 10px;">${row.frequency} lần</td>
+                        <td style="padding: 10px;" colspan="2">${formatMoney(row.total_amount)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '<tr><td colspan="4" style="background: #fff3cd; padding: 10px; font-weight: 600;">⚠️ Sản phẩm mới</td></tr>';
+            evidence.new_products.forEach(row => {
+                html += `
+                    <tr style="border-bottom: 1px solid #eee; background: #fffbf0;">
+                        <td style="padding: 10px;">${row.period}</td>
+                        <td style="padding: 10px; font-weight: 600;">${row.value}</td>
+                        <td style="padding: 10px;" colspan="2">${row.comparison}</td>
+                    </tr>
+                `;
+            });
+            
+            return html;
         }
     },
     
@@ -1137,20 +1250,18 @@ const anomalyConfig = {
         color: '#28a745',
         getExplanation: (m) => {
             const sigma = m.sigma_count || 0;
-            const max = formatMoney(m.max_order_value);
-            const threshold = formatMoney(m.threshold_3sigma);
-            return `Có đơn hàng với giá trị ${max} cao hơn ${sigma.toFixed(2)} lần độ lệch chuẩn so với trung bình (ngưỡng 3σ: ${threshold}). ` +
-                   `Đây là outlier thống kê, cần kiểm tra kỹ.`;
+            return `Có đơn hàng với giá trị cao hơn ${sigma.toFixed(2)} lần độ lệch chuẩn.`;
         },
         renderEvidence: (evidence) => {
             if (!evidence || evidence.length === 0) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
+            
             return evidence.map((row, idx) => `
                 <tr style="border-bottom: 1px solid #eee; ${idx === 0 ? 'background: #fff3cd;' : ''}">
                     <td style="padding: 10px;">${row.period}</td>
                     <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;">${row.comparison} ${idx === 0 ? '⚠️ CAO NHẤT' : ''}</td>
+                    <td style="padding: 10px;" colspan="2">${row.comparison} ${idx === 0 ? '⚠️ CAO NHẤT' : ''}</td>
                 </tr>
             `).join('');
         }
@@ -1161,24 +1272,19 @@ const anomalyConfig = {
         title: 'Không Mua Sau Khi Tăng Đột Biến',
         color: '#6c757d',
         getExplanation: (m) => {
-            const drop = m.drop_percent || 0;
-            const hasActivity = m.has_activity || false;
-            return `Sau khi mua nhiều đột biến, khách hàng ${hasActivity ? 'giảm ' + drop + '%' : 'ngừng mua hoàn toàn'} trong 1-2 tháng tiếp theo. ` +
-                   `Đây là dấu hiệu rõ ràng của việc "đẩy" doanh số để đạt KPI.`;
+            return `Sau khi mua nhiều đột biến, khách hàng ngừng mua hoàn toàn.`;
         },
         renderEvidence: (evidence) => {
             if (!evidence || evidence.length === 0) {
-                return '<tr><td colspan="3" class="text-center text-muted">Không có dữ liệu</td></tr>';
+                return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
             return evidence.map(row => {
-                const isSpike = row.period.includes('Spike');
-                const isAfter = row.period.includes('Sau spike');
-                const noActivity = row.comparison.includes('Không có');
+                const noActivity = row.comparison && row.comparison.includes('Không có');
                 return `
-                <tr style="border-bottom: 1px solid #eee; ${isSpike ? 'background: #fff3cd;' : ''} ${noActivity ? 'background: #f8d7da;' : ''}">
+                <tr style="border-bottom: 1px solid #eee; ${noActivity ? 'background: #f8d7da;' : ''}">
                     <td style="padding: 10px;">${row.period}</td>
                     <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;">${row.comparison} ${noActivity ? '⚠️ NGỪNG' : ''}</td>
+                    <td style="padding: 10px;" colspan="2">${row.comparison} ${noActivity ? '⚠️ NGỪNG' : ''}</td>
                 </tr>
             `}).join('');
         }
@@ -1442,16 +1548,21 @@ function getActions(type) {
 // HÀM HIỂN THỊ MODAL
 // ============================================
 function showAnomalyDetailModal(data) {
+    console.log('🎯 Opening modal for:', data.type);
+    console.log('Data:', data);
+    
     const config = anomalyConfig[data.type];
     if (!config) {
-        console.error('Không tìm thấy config cho type:', data.type);
+        console.error('❌ Không tìm thấy config cho type:', data.type);
+        alert('Lỗi: Loại bất thường không được hỗ trợ');
         return;
     }
     
     const metrics = data.metrics || {};
     const modal = document.getElementById('anomalyDetailModal');
+    
     if (!modal) {
-        console.error('Không tìm thấy modal');
+        console.error('❌ Không tìm thấy modal');
         return;
     }
     
@@ -1475,40 +1586,54 @@ function showAnomalyDetailModal(data) {
         </div>
     `).join('');
     
-    // Tab 2: MINH CHỨNG - DỮ LIỆU THẬT
+    // Tab 2: MINH CHỨNG
     const tableBody = document.querySelector('#anomaly-data-table tbody');
-    tableBody.innerHTML = config.renderEvidence(metrics.evidence);
-    
-    // Tab 3: TÍNH TOÁN
-    document.getElementById('anomaly-formula').innerHTML = getFormula(data.type, metrics);
-    
-    // Tab 4: HÀNH ĐỘNG
-    const actionsList = document.getElementById('anomaly-actions');
-    actionsList.innerHTML = getActions(data.type).map(a => `<li>${a}</li>`).join('');
+    if (metrics.evidence && metrics.evidence.length > 0) {
+        console.log('✅ Rendering evidence:', metrics.evidence.length, 'rows');
+        console.log('Evidence data:', metrics.evidence);
+        tableBody.innerHTML = config.renderEvidence(metrics.evidence);
+    } else {
+        console.warn('⚠️ No evidence data');
+        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu minh chứng</td></tr>';
+    }
     
     // Mở modal
-    const bsModal = new bootstrap.Modal(modal);
-    bsModal.show();
+    try {
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        console.log('✅ Modal opened');
+    } catch(e) {
+        console.error('❌ Error opening modal:', e);
+    }
 }
 
 // ============================================
 // KHỞI TẠO KHI TRANG LOAD
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    // Gắn sự kiện click cho tất cả anomaly list items
+    console.log('🔧 Initializing Anomaly Modal System...');
+    
+    // Gắn sự kiện click
     document.querySelectorAll('.anomaly-list-item').forEach(item => {
         item.addEventListener('click', function() {
             const jsonData = this.dataset.anomalyJson;
+            
+            console.log('📋 Clicked item');
+            console.log('Raw JSON (first 200 chars):', jsonData ? jsonData.substring(0, 200) : 'EMPTY');
+            
             if (!jsonData) {
-                console.error('Không có dữ liệu JSON');
+                console.error('❌ Không có data-anomaly-json');
+                alert('Lỗi: Không có dữ liệu chi tiết');
                 return;
             }
             
             try {
                 const data = JSON.parse(jsonData);
+                console.log('✅ Parsed:', data);
                 showAnomalyDetailModal(data);
             } catch(e) {
-                console.error('Lỗi parse JSON:', e);
+                console.error('❌ Parse error:', e);
+                alert('Lỗi parse JSON: ' + e.message);
             }
         });
     });
@@ -1518,19 +1643,19 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function() {
             const tabName = this.dataset.tab;
             
-            // Remove active
             document.querySelectorAll('.anomaly-tab-btn').forEach(b => {
                 b.style.color = '#666';
                 b.style.borderBottomColor = 'transparent';
             });
             document.querySelectorAll('.anomaly-tab-content').forEach(c => c.style.display = 'none');
             
-            // Add active
             this.style.color = '#667eea';
             this.style.borderBottomColor = '#667eea';
             document.getElementById(`anomaly-${tabName}-tab`).style.display = 'block';
         });
     });
+    
+    console.log('✅ System initialized');
 });
 
 // ============================================
