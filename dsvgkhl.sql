@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 08, 2025 at 02:25 AM
+-- Generation Time: Dec 20, 2025 at 03:09 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -107,7 +107,9 @@ ALTER TABLE `dskh`
   ADD KEY `idx_tinh` (`Tinh`),
   ADD KEY `idx_quan_huyen` (`QuanHuyen`),
   ADD KEY `idx_loai_kh` (`LoaiKH`),
-  ADD KEY `idx_tinh_quan` (`Tinh`,`QuanHuyen`);
+  ADD KEY `idx_tinh_quan` (`Tinh`,`QuanHuyen`),
+  ADD KEY `idx_ma_nvbh` (`MaNVBH`),
+  ADD KEY `idx_ma_gsbh` (`MaGSBH`);
 
 --
 -- Indexes for table `gkhl`
@@ -131,7 +133,14 @@ ALTER TABLE `orderdetail`
   ADD KEY `idx_cust_code` (`CustCode`),
   ADD KEY `idx_cust_rpt` (`CustCode`,`RptMonth`,`RptYear`),
   ADD KEY `idx_order_date` (`OrderDate`),
-  ADD KEY `idx_main_query` (`RptMonth`,`RptYear`,`CustCode`);
+  ADD KEY `idx_main_query` (`RptMonth`,`RptYear`,`CustCode`),
+  ADD KEY `idx_dsr_code` (`DSRCode`),
+  ADD KEY `idx_dsr_date` (`DSRCode`,`OrderDate`),
+  ADD KEY `idx_dsr_rpt` (`DSRCode`,`RptYear`,`RptMonth`),
+  ADD KEY `idx_anomaly_detection` (`CustCode`,`RptYear`,`RptMonth`,`OrderDate`,`TotalNetAmount`),
+  ADD KEY `idx_product_code` (`CustCode`,`ProductCode`(2),`RptYear`,`RptMonth`),
+  ADD KEY `idx_product_analysis` (`CustCode`,`ProductCode`,`RptYear`,`RptMonth`),
+  ADD KEY `idx_date_range` (`OrderDate`,`CustCode`,`TotalNetAmount`);
 
 --
 -- AUTO_INCREMENT for dumped tables
