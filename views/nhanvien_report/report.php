@@ -72,11 +72,16 @@
                                value="<?= htmlspecialchars($den_ngay) ?>" required>
                     </div>
                     
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">
                             <i class="fas fa-search"></i> Rà Soát
                         </button>
                     </div>
+                    <div class="col-md-1">
+                <a href="nhanvien_report.php" class="btn btn-secondary">
+                    <i class="fas fa-sync"></i> Làm Mới
+                </a>
+            </div>
                 </div>
             </form>
 
@@ -229,19 +234,6 @@
                 </div>
                 <?php endif; ?>
             <?php endif; ?>
-
-            <!-- Action Buttons -->
-            <div class="btn-group-custom">
-                <a href="nhanvien_kpi.php" class="btn btn-info">
-                    <i class="fas fa-chart-line"></i> Báo Cáo KPI
-                </a>
-                <a href="index.php" class="btn btn-success">
-                    <i class="fas fa-upload"></i> Upload File Mới
-                </a>
-                <a href="nhanvien_report.php" class="btn btn-secondary">
-                    <i class="fas fa-sync"></i> Làm Mới
-                </a>
-            </div>
         </div>
     </div>
 </div>
@@ -267,6 +259,64 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+
+async function showCustomerList(empCode, event) {
+    event.preventDefault();
+    
+    // Lấy dữ liệu từ server
+    const params = new URLSearchParams(window.location.search);
+    const response = await fetch(`nhanvien_kpi.php?action=get_customers&dsr_code=${empCode}&${params}`);
+    const customers = await response.json();
+    
+    // Hiển thị
+    document.getElementById('empCode').textContent = empCode;
+    const content = document.getElementById('customerListContent');
+    
+    if (customers.length === 0) {
+        content.innerHTML = 'Không có dữ liệu';
+    } else {
+        let html = `
+            
+                
+                    
+                        STT
+                        Mã KH
+                        Tên KH
+                        Địa chỉ
+                        Tỉnh
+                        Đơn hàng
+                        Doanh số
+                        Lần đầu
+                        Lần cuối
+                    
+                
+                
+        `;
+        
+        customers.forEach((c, i) => {
+            html += `
+                
+                    ${i+1}
+                    ${c.CustCode}
+                    ${c.customer_name || 'N/A'}
+                    ${c.customer_address || 'N/A'}
+                    ${c.customer_province || 'N/A'}
+                    ${c.total_orders}
+                    ${Number(c.total_sales).toLocaleString()}
+                    ${c.first_contact}
+                    ${c.last_contact}
+                
+            `;
+        });
+        
+        html += '';
+        content.innerHTML = html;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('customerListModal'));
+    modal.show();
+}
+
 function showReportDetails(jsonData, jsonBenchmark) {
     try {
         const data = JSON.parse(jsonData);

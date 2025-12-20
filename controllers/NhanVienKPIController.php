@@ -1,7 +1,6 @@
 <?php
 /**
- * ✅ CONTROLLER TỐI ƯU - KPI Nhân Viên
- * Chỉ 3 queries thay vì hàng trăm
+ * ✅ CONTROLLER TỐI ƯU V2 - KPI Nhân Viên với Ngưỡng N
  */
 
 require_once 'models/NhanVienKPIModel.php';
@@ -23,8 +22,10 @@ class NhanVienKPIController {
         $available_products = [];
         $has_filtered = false;
         
+        // ✅ NGƯỠNG N MẶC ĐỊNH
+        $threshold_n = isset($_GET['threshold_n']) ? intval($_GET['threshold_n']) : 5;
+        
         try {
-            // Lấy danh sách tháng
             $available_months = $this->model->getAvailableMonths();
             
             if (empty($available_months)) {
@@ -36,7 +37,6 @@ class NhanVienKPIController {
             
             $available_products = $this->model->getAvailableProducts();
             
-            // Kiểm tra xem user đã submit form chưa
             $has_filtered = !empty($_GET['tu_ngay']) && !empty($_GET['den_ngay']);
             
             if (!$has_filtered) {
@@ -44,20 +44,18 @@ class NhanVienKPIController {
                     'thang' => $available_months[0] ?? '',
                     'tu_ngay' => !empty($available_months[0]) ? $available_months[0] . '-01' : '',
                     'den_ngay' => !empty($available_months[0]) ? date('Y-m-t', strtotime($available_months[0] . '-01')) : '',
-                    'product_filter' => ''
+                    'product_filter' => '',
+                    'threshold_n' => $threshold_n
                 ];
                 
                 $statistics = [
                     'total_employees' => 0,
                     'employees_with_orders' => 0,
                     'total_orders' => 0,
+                    'total_customers' => 0,
                     'total_amount' => 0,
                     'avg_orders_per_emp' => 0,
-                    'avg_daily_orders' => 0,
-                    'avg_daily_amount' => 0,
-                    'max_daily_orders' => 0,
-                    'max_daily_amount' => 0,
-                    'std_dev_orders' => 0,
+                    'avg_customers_per_emp' => 0,
                     'warning_count' => 0,
                     'danger_count' => 0,
                     'normal_count' => 0
@@ -67,7 +65,7 @@ class NhanVienKPIController {
                 return;
             }
             
-            // User đã submit → Bắt đầu xử lý
+            // User đã submit
             $thang = !empty($_GET['thang']) ? $_GET['thang'] : $available_months[0];
             if (!in_array($thang, $available_months)) $thang = $available_months[0];
             
@@ -86,11 +84,12 @@ class NhanVienKPIController {
                 'thang' => $thang,
                 'tu_ngay' => $tu_ngay,
                 'den_ngay' => $den_ngay,
-                'product_filter' => $product_filter
+                'product_filter' => $product_filter,
+                'threshold_n' => $threshold_n
             ];
             
-            // ✅ QUERY 1: LẤY TẤT CẢ NHÂN VIÊN KÈM KPI (1 QUERY DUY NHẤT)
-            $employees = $this->model->getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter);
+            // ✅ LẤY DỮ LIỆU VỚI NGƯỠNG N
+            $employees = $this->model->getAllEmployeesWithKPI($tu_ngay, $den_ngay, $product_filter, $threshold_n);
             
             if (empty($employees)) {
                 $message = "⚠️ Không có dữ liệu nhân viên.";
@@ -99,74 +98,48 @@ class NhanVienKPIController {
                 return;
             }
             
-            // ✅ QUERY 2: LẤY THỐNG KÊ HỆ THỐNG (1 QUERY)
             $system_metrics = $this->model->getSystemMetrics($tu_ngay, $den_ngay, $product_filter);
-            
-            // ✅ QUERY 3: LẤY DAILY ORDERS ĐỂ TÍNH STD DEV (1 QUERY)
-            $all_daily_orders = $this->model->getAllDailyOrdersForStdDev($tu_ngay, $den_ngay, $product_filter);
-            $std_dev_orders = $this->calculateStdDev($all_daily_orders);
             
             // Tính toán benchmark
             $emp_count = $system_metrics['emp_count'];
             $total_orders = $system_metrics['total_orders'];
+            $total_customers = $system_metrics['total_customers'];
             $total_amount = $system_metrics['total_amount'];
-            $total_working_days = $system_metrics['total_working_days'];
             
             $avg_orders_per_emp = $emp_count > 0 ? $total_orders / $emp_count : 0;
-            $avg_daily_orders = $total_working_days > 0 ? $total_orders / $total_working_days : 0;
-            $avg_daily_amount = $total_working_days > 0 ? $total_amount / $total_working_days : 0;
+            $avg_customers_per_emp = $emp_count > 0 ? $total_customers / $emp_count : 0;
             
-            // ✅ PHÂN LOẠI (KHÔNG CẦN QUERY THÊM)
+            // Phân loại
             $suspicious_employees = [];
             $warning_employees = [];
             $normal_employees = [];
             
             foreach ($employees as &$emp_kpi) {
-                // Tính risk score
-                $score = 0;
+                // Risk reasons
                 $reasons = [];
                 
-                // Performance
-                if ($avg_daily_orders > 0) {
-                    $perf_ratio = $emp_kpi['avg_daily_orders'] / $avg_daily_orders;
-                    
-                    if ($perf_ratio >= 1.5) {
-                        $score += 30;
-                        $reasons[] = "Hiệu suất " . number_format($perf_ratio * 100, 0) . "% so với chung";
-                    }
+                if ($emp_kpi['violation_count'] > 0) {
+                    $reasons[] = "Vi phạm ngưỡng {$emp_kpi['violation_count']} ngày ({$emp_kpi['risk_analysis']['violation_rate']}% thời gian)";
                 }
                 
-                // Consistency
-                $consistency = $this->calculateConsistency($emp_kpi['daily_orders']);
-                $emp_kpi['consistency_score'] = $consistency;
+                if ($emp_kpi['risk_analysis']['max_violation'] > 0) {
+                    $reasons[] = "Vượt tối đa {$emp_kpi['risk_analysis']['max_violation']} khách so với ngưỡng";
+                }
                 
-                if ($consistency < 50) {
-                    $score += 25;
-                    $reasons[] = "Không nhất quán: " . round($consistency, 1) . "%";
+                if ($emp_kpi['risk_analysis']['consecutive_violations'] >= 3) {
+                    $reasons[] = "Vi phạm liên tục {$emp_kpi['risk_analysis']['consecutive_violations']} ngày";
                 }
                 
                 if (empty($reasons)) {
-                    $reasons[] = "Hoạt động bình thường";
+                    $reasons[] = "Hoạt động trong ngưỡng cho phép";
                 }
                 
-                $risk_score = intval(min(100, max(0, $score)));
-                
-                if ($risk_score >= 75) {
-                    $risk_level = 'critical';
-                } elseif ($risk_score >= 50) {
-                    $risk_level = 'warning';
-                } else {
-                    $risk_level = 'normal';
-                }
-                
-                $emp_kpi['risk_score'] = $risk_score;
-                $emp_kpi['risk_level'] = $risk_level;
                 $emp_kpi['risk_reasons'] = $reasons;
                 
                 // Phân loại
-                if ($risk_score >= 75) {
+                if ($emp_kpi['risk_level'] === 'critical') {
                     $suspicious_employees[] = $emp_kpi;
-                } elseif ($risk_score >= 50) {
+                } elseif ($emp_kpi['risk_level'] === 'warning') {
                     $warning_employees[] = $emp_kpi;
                 } else {
                     $normal_employees[] = $emp_kpi;
@@ -183,16 +156,14 @@ class NhanVienKPIController {
                 'total_employees' => count($employees),
                 'employees_with_orders' => $emp_count,
                 'total_orders' => $total_orders,
+                'total_customers' => $total_customers,
                 'total_amount' => $total_amount,
                 'avg_orders_per_emp' => round($avg_orders_per_emp, 2),
-                'avg_daily_orders' => round($avg_daily_orders, 2),
-                'avg_daily_amount' => round($avg_daily_amount, 0),
-                'max_daily_orders' => $system_metrics['max_daily_orders'],
-                'max_daily_amount' => $system_metrics['max_daily_amount'],
-                'std_dev_orders' => round($std_dev_orders, 2),
+                'avg_customers_per_emp' => round($avg_customers_per_emp, 2),
                 'warning_count' => count($warning_employees),
                 'danger_count' => count($suspicious_employees),
-                'normal_count' => count($normal_employees)
+                'normal_count' => count($normal_employees),
+                'threshold_n' => $threshold_n
             ];
             
             $kpi_data = array_merge($suspicious_employees, $warning_employees, $normal_employees);
@@ -201,7 +172,7 @@ class NhanVienKPIController {
                 $message = "⚠️ Không có dữ liệu cho khoảng thời gian này.";
                 $type = 'warning';
             } else {
-                $message = "✅ Đã phân tích " . count($kpi_data) . " nhân viên trong <2 giây!";
+                $message = "✅ Đã phân tích " . count($kpi_data) . " nhân viên với ngưỡng N={$threshold_n} khách/ngày!";
                 $type = 'success';
             }
             
@@ -214,35 +185,27 @@ class NhanVienKPIController {
         require_once 'views/nhanvien_kpi/report.php';
     }
     
-    private function calculateConsistency($daily_orders) {
-        if (count($daily_orders) < 2) return 100;
+    /**
+     * ✅ AJAX: Lấy chi tiết khách hàng của nhân viên
+     */
+    public function getEmployeeCustomers() {
+        header('Content-Type: application/json');
         
-        $mean = array_sum($daily_orders) / count($daily_orders);
-        $deviations = array_map(fn($x) => pow($x - $mean, 2), $daily_orders);
-        $variance = array_sum($deviations) / count($daily_orders);
-        $std_dev = sqrt($variance);
+        $dsr_code = $_GET['dsr_code'] ?? '';
+        $tu_ngay = $_GET['tu_ngay'] ?? '';
+        $den_ngay = $_GET['den_ngay'] ?? '';
+        $product_filter = $_GET['product_filter'] ?? '';
         
-        if ($mean > 0) {
-            $cv_percent = ($std_dev / $mean) * 100;
-        } else {
-            $cv_percent = 0;
+        if (empty($dsr_code) || empty($tu_ngay) || empty($den_ngay)) {
+            echo json_encode(['success' => false, 'error' => 'Missing parameters']);
+            return;
         }
         
-        if ($cv_percent <= 10) return 100;
-        elseif ($cv_percent <= 20) return 90;
-        elseif ($cv_percent <= 30) return 80;
-        elseif ($cv_percent <= 50) return 60;
-        else return 40;
-    }
-    
-    private function calculateStdDev($arr) {
-        if (count($arr) < 2) return 0;
-        
-        $avg = array_sum($arr) / count($arr);
-        $deviations = array_map(fn($x) => pow($x - $avg, 2), $arr);
-        $variance = array_sum($deviations) / count($deviations);
-        
-        return sqrt($variance);
+        try {
+            $customers = $this->model->getEmployeeCustomerDetails($dsr_code, $tu_ngay, $den_ngay, $product_filter);
+            echo json_encode(['success' => true, 'data' => $customers]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 }
-?>

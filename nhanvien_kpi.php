@@ -3,5 +3,14 @@ session_start();
 require_once 'controllers/NhanVienKPIController.php';
 
 $controller = new NhanVienKPIController();
-$controller->showKPIReport();
-?>
+
+// ✅ HỖ TRỢ AJAX REQUEST
+$action = $_GET['action'] ?? 'report';
+
+if ($action === 'get_customers') {
+    // AJAX call để lấy danh sách khách hàng
+    $controller->getEmployeeCustomers();
+} else {
+    // Hiển thị trang báo cáo chính
+    $controller->showKPIReport();
+}

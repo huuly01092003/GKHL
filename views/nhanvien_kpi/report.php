@@ -3,360 +3,391 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Báo Cáo KPI - Phân tích Nhân Viên</title>
+    <title>Báo Cáo KPI V2 - Logic Ngưỡng N</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .card { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin-bottom: 25px; }
         .card-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 20px 20px 0 0; }
-        .filter-section { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .kpi-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 15px; }
-        .kpi-icon { font-size: 2rem; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
-        .kpi-card-info .kpi-icon { background: #e3f2fd; color: #1976d2; }
-        .kpi-card-primary .kpi-icon { background: #f3e5f5; color: #7b1fa2; }
-        .kpi-card-success .kpi-icon { background: #e8f5e9; color: #388e3c; }
-        .kpi-card-warning .kpi-icon { background: #fff3e0; color: #f57c00; }
-        .kpi-card-danger .kpi-icon { background: #ffebee; color: #d32f2f; }
-        .kpi-card-light .kpi-icon { background: #f5f5f5; color: #616161; }
-        .kpi-content { flex: 1; }
-        .kpi-label { font-size: 0.9rem; color: #666; margin-bottom: 5px; }
-        .kpi-value { font-size: 1.8rem; font-weight: 700; color: #333; }
-        .kpi-subtext { font-size: 0.85rem; color: #999; }
-        .kpi-table thead th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white !important; font-weight: 700; border: none; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .kpi-table tbody tr { border-bottom: 1px solid #e0e0e0; transition: background 0.2s; }
-        .kpi-table tbody tr:hover { background: rgba(102, 126, 234, 0.05); }
-        .benchmark-box { background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .benchmark-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; }
-        .kpi-legend { display: flex; gap: 20px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; flex-wrap: wrap; }
-        .legend-item { display: flex; align-items: center; gap: 10px; }
-        .legend-badge { width: 30px; height: 20px; border-radius: 5px; }
-        .btn-group-custom { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
-        .debug-info { background: #f8f9fa; border-left: 4px solid #667eea; padding: 10px 15px; margin-top: 20px; border-radius: 4px; font-size: 0.9rem; color: #555; }
-        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
-        .empty-state i { font-size: 4rem; color: #ddd; margin-bottom: 20px; }
+        .kpi-card { background: white; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); text-align: center; }
+        .kpi-value { font-size: 2rem; font-weight: 700; color: #333; }
+        .kpi-label { font-size: 0.85rem; color: #666; margin-top: 5px; }
+        .threshold-box { background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 15px; border-radius: 10px; border-left: 4px solid #ffc107; }
+        .violation-badge { background: #dc3545; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+        .customer-row { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .customer-row:hover { background: #f8f9fa; }
+        .order-chip { background: #e3f2fd; padding: 3px 8px; border-radius: 8px; margin: 2px; display: inline-block; font-size: 0.75rem; }
     </style>
 </head>
 <body>
 <div class="container-fluid">
-    <div class="card mt-4 mb-4">
+    <div class="card mt-4">
         <div class="card-header">
-            <h2><i class="fas fa-chart-line"></i> PHÂN TÍCH KPI - NHÂN VIÊN</h2>
+            <h2><i class="fas fa-chart-line"></i> PHÂN TÍCH KPI - LOGIC NGƯỠNG N</h2>
+            <p class="mb-0">Hệ thống quét từng ngày để phát hiện vi phạm ngưỡng khách/ngày</p>
         </div>
         
         <div class="card-body">
             <?php if (!empty($message)): ?>
-                <div class="alert alert-<?= htmlspecialchars($type ?? 'info') ?> alert-dismissible fade show" role="alert">
+                <div class="alert alert-<?= htmlspecialchars($type ?? 'info') ?> alert-dismissible">
                     <?= $message ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
 
-            <form id="kpiFilterForm" method="get" class="filter-section">
-                <input type="hidden" name="action" value="kpi_report">
+            <!-- FORM FILTER -->
+            <form method="get" class="p-4" style="background: #f8f9fa; border-radius: 10px;">
                 <div class="row g-3">
                     <div class="col-md-2">
-                        <label class="form-label fw-bold"><i class="fas fa-calendar-alt"></i> Tháng</label>
-                        <select id="thang" name="thang" class="form-select" required>
+                        <label class="form-label fw-bold">Tháng</label>
+                        <select name="thang" class="form-select" required>
                             <?php foreach ($available_months as $m): ?>
-                                <option value="<?= htmlspecialchars($m) ?>" <?= ($m === ($filters['thang'] ?? '')) ? 'selected' : '' ?>>
-                                    Tháng <?= date('m/Y', strtotime($m . '-01')) ?>
+                                <option value="<?= $m ?>" <?= ($m === ($filters['thang'] ?? '')) ? 'selected' : '' ?>>
+                                    <?= date('m/Y', strtotime($m . '-01')) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     
                     <div class="col-md-2">
-                        <label class="form-label fw-bold"><i class="fas fa-calendar"></i> Từ Ngày</label>
-                        <input type="date" id="tuNgay" name="tu_ngay" class="form-control" 
+                        <label class="form-label fw-bold">Từ Ngày</label>
+                        <input type="date" name="tu_ngay" class="form-control" 
                                value="<?= htmlspecialchars($filters['tu_ngay'] ?? '') ?>" required>
                     </div>
                     
                     <div class="col-md-2">
-                        <label class="form-label fw-bold"><i class="fas fa-calendar"></i> Đến Ngày</label>
-                        <input type="date" id="denNgay" name="den_ngay" class="form-control" 
+                        <label class="form-label fw-bold">Đến Ngày</label>
+                        <input type="date" name="den_ngay" class="form-control" 
                                value="<?= htmlspecialchars($filters['den_ngay'] ?? '') ?>" required>
                     </div>
                     
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold"><i class="fas fa-cube"></i> Nhóm Sản Phẩm</label>
-                        <select id="productFilter" name="product_filter" class="form-select">
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Nhóm SP</label>
+                        <select name="product_filter" class="form-select">
                             <option value="">-- Tất Cả --</option>
-                            <?php if (!empty($available_products)): foreach ($available_products as $prod): ?>
-                                <option value="<?= htmlspecialchars($prod) ?>" 
-                                        <?= ($prod === ($filters['product_filter'] ?? '')) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($prod) ?>
-                                </option>
+                            <?php if (!empty($available_products)): foreach ($available_products as $p): ?>
+                                <option value="<?= $p ?>" <?= ($p === ($filters['product_filter'] ?? '')) ? 'selected' : '' ?>><?= $p ?></option>
                             <?php endforeach; endif; ?>
                         </select>
                     </div>
                     
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">&nbsp;</label>
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary flex-fill">
-                                <i class="fas fa-filter"></i> Lọc
-                            </button>
-                            <a href="nhanvien_kpi.php" class="btn btn-secondary">
-                                <i class="fas fa-sync"></i> Reset
-                            </a>
-                        </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">
+                            Ngưỡng N <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" name="threshold_n" class="form-control" 
+                               value="<?= $filters['threshold_n'] ?? 5 ?>" min="1" max="100" required>
+                        <small class="text-muted">khách/ngày</small>
                     </div>
+                    
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search"></i> Phân Tích
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="threshold-box mt-3">
+                    <strong><i class="fas fa-info-circle"></i> Logic:</strong> 
+                    Hệ thống sẽ đánh dấu mỗi ngày có <strong>số khách > <?= $filters['threshold_n'] ?? 5 ?></strong> là vi phạm.
+                    Risk Score = f(tỷ lệ ngày vi phạm, mức độ vượt, số ngày liên tục).
                 </div>
             </form>
 
-            <!-- ⭐ EMPTY STATE - Khi chưa filter -->
             <?php if (!$has_filtered): ?>
-                <div class="empty-state">
-                    <i class="fas fa-filter"></i>
-                    <h4>Vui lòng chọn khoảng ngày để bắt đầu</h4>
-                    <p class="text-muted">Hệ thống sẽ tính toán dữ liệu khi bạn nhấn "Lọc"</p>
+                <div class="text-center py-5">
+                    <i class="fas fa-filter fa-4x text-muted mb-3"></i>
+                    <h4>Nhập ngưỡng N và chọn khoảng thời gian</h4>
                 </div>
             <?php else: ?>
-                <!-- KPI Cards -->
-                <div class="row g-3 mt-2">
+                <!-- KPI CARDS -->
+                <div class="row g-3 mt-3">
                     <div class="col-md-2">
-                        <div class="kpi-card kpi-card-info">
-                            <div class="kpi-icon"><i class="fas fa-users"></i></div>
-                            <div class="kpi-content">
-                                <div class="kpi-label">Nhân Viên Có ĐH</div>
-                                <div class="kpi-value"><?= $statistics['employees_with_orders'] ?? 0 ?></div>
-                                <div class="kpi-subtext">/ <?= $statistics['total_employees'] ?? 0 ?></div>
-                            </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value text-primary"><?= $statistics['employees_with_orders'] ?></div>
+                            <div class="kpi-label">Nhân Viên</div>
                         </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="kpi-card kpi-card-primary">
-                            <div class="kpi-icon"><i class="fas fa-shopping-cart"></i></div>
-                            <div class="kpi-content">
-                                <div class="kpi-label">Tổng Đơn Hàng</div>
-                                <div class="kpi-value"><?= number_format($statistics['total_orders'] ?? 0) ?></div>
-                                <div class="kpi-subtext">đơn</div>
-                            </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value text-info"><?= number_format($statistics['total_orders']) ?></div>
+                            <div class="kpi-label">Tổng Đơn</div>
                         </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="kpi-card kpi-card-success">
-                            <div class="kpi-icon"><i class="fas fa-chart-bar"></i></div>
-                            <div class="kpi-content">
-                                <div class="kpi-label">TBD Chung</div>
-                                <div class="kpi-value"><?= number_format($statistics['avg_orders_per_emp'] ?? 0, 1) ?></div>
-                                <div class="kpi-subtext">đơn/NV</div>
-                            </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value text-success"><?= number_format($statistics['total_customers']) ?></div>
+                            <div class="kpi-label">Tổng Khách</div>
                         </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="kpi-card kpi-card-warning">
-                            <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                            <div class="kpi-content">
-                                <div class="kpi-label">Cảnh Báo</div>
-                                <div class="kpi-value"><?= $statistics['warning_count'] ?? 0 ?></div>
-                                <div class="kpi-subtext">người</div>
-                            </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value text-warning"><?= $statistics['warning_count'] ?></div>
+                            <div class="kpi-label">Cảnh Báo</div>
                         </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="kpi-card kpi-card-danger">
-                            <div class="kpi-icon"><i class="fas fa-virus"></i></div>
-                            <div class="kpi-content">
-                                <div class="kpi-label">Nguy Hiểm</div>
-                                <div class="kpi-value"><?= $statistics['danger_count'] ?? 0 ?></div>
-                                <div class="kpi-subtext">người</div>
-                            </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value text-danger"><?= $statistics['danger_count'] ?></div>
+                            <div class="kpi-label">Nghiêm Trọng</div>
                         </div>
                     </div>
                     <div class="col-md-2">
-                        <div class="kpi-card kpi-card-light">
-                            <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
-                            <div class="kpi-content">
-                                <div class="kpi-label">Bình Thường</div>
-                                <div class="kpi-value"><?= $statistics['normal_count'] ?? 0 ?></div>
-                                <div class="kpi-subtext">người</div>
-                            </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value"><?= $statistics['normal_count'] ?></div>
+                            <div class="kpi-label">Bình Thường</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Benchmark Box -->
-                <div class="benchmark-box">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="benchmark-item">
-                                <strong>📊 TBD Cao Nhất (Chung):</strong>
-                                <span class="badge bg-success"><?= number_format($statistics['max_daily_orders'] ?? 0, 1) ?> đơn</span>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="benchmark-item">
-                                <strong>📊 TBD Chung:</strong>
-                                <span class="badge bg-info"><?= number_format($statistics['avg_daily_orders'] ?? 0, 2) ?> đơn</span>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="benchmark-item">
-                                <strong>📈 Độ Biến Động (Std Dev):</strong>
-                                <span class="badge bg-warning text-dark"><?= number_format($statistics['std_dev_orders'] ?? 0, 2) ?></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Legend -->
-                <div class="kpi-legend">
-                    <div class="legend-item"><span class="legend-badge" style="background: #ff6b6b;"></span> <strong>Critical (75-100)</strong></div>
-                    <div class="legend-item"><span class="legend-badge" style="background: #ffc107;"></span> <strong>Warning (50-74)</strong></div>
-                    <div class="legend-item"><span class="legend-badge" style="background: #28a745;"></span> <strong>Normal (0-49)</strong></div>
-                </div>
-
-                <!-- Data Table -->
-                <div class="table-responsive mt-4" style="max-height: 600px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 5px;">
-                    <table class="table table-hover kpi-table" style="margin-bottom: 0;">
-                        <thead class="table-light">
+                <!-- TABLE -->
+                <div class="table-responsive mt-4" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table table-hover">
+                        <thead style="position: sticky; top: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; z-index: 10;">
                             <tr>
-                                <th class="text-center" style="width: 60px;">Mức Độ</th>
+                                <th class="text-center" style="width: 80px;">Mức Độ</th>
                                 <th style="width: 100px;">Mã NV</th>
-                                <th>Tên Nhân Viên</th>
-                                <th class="text-end">Tổng ĐH</th>
-                                <th class="text-end">TBD/Ngày</th>
-                                <th class="text-end">Max/Ngày</th>
-                                <th class="text-end">Min/Ngày</th>
-                                <th class="text-center">Nhất Quán %</th>
-                                <th class="text-end">Risk Score</th>
-                                <th class="text-center">Chi Tiết</th>
+                                <th style="width: 200px;">Tên NV</th>
+                                <th style="width: 100px;">GSBH</th>
+                                <th class="text-end" style="width: 100px;">TB Khách/Ngày</th>
+                                <th class="text-end" style="width: 100px;">Max/Ngày</th>
+                                <th class="text-center" style="width: 100px;">Vi Phạm</th>
+                                <th class="text-end" style="width: 80px;">Risk</th>
+                                <th class="text-center" style="width: 150px;">Thao Tác</th>
                             </tr>
                         </thead>
                         <tbody>
-                        <?php if (!empty($kpi_data)): ?>
-                            <?php foreach ($kpi_data as $item): ?>
-                            <?php
-                                $risk_level = isset($item['risk_level']) ? $item['risk_level'] : 'normal';
-                                $badge_class = ($risk_level === 'critical') ? 'bg-danger' : (($risk_level === 'warning') ? 'bg-warning text-dark' : 'bg-success');
-                                $icon = ($risk_level === 'critical') ? '🚨' : (($risk_level === 'warning') ? '⚠️' : '✅');
+                        <?php if (!empty($kpi_data)): foreach ($kpi_data as $item): ?>
+                            <?php 
+                                $badge = ($item['risk_level'] === 'critical') ? 'bg-danger' : (($item['risk_level'] === 'warning') ? 'bg-warning text-dark' : 'bg-success');
+                                $icon = ($item['risk_level'] === 'critical') ? '🚨' : (($item['risk_level'] === 'warning') ? '⚠️' : '✅');
                             ?>
                             <tr>
-                                <td class="text-center"><span class="badge <?= $badge_class ?>"><?= $icon ?></span></td>
-                                <td><strong><?= htmlspecialchars($item['ma_nv'] ?? '') ?></strong></td>
-                                <td><?= htmlspecialchars($item['ten_nv'] ?? '') ?></td>
-                                <td class="text-end fw-bold"><?= number_format($item['total_orders'] ?? 0) ?></td>
-                                <td class="text-end"><?= number_format($item['avg_daily_orders'] ?? 0, 1) ?></td>
-                                <td class="text-end text-success"><strong><?= $item['max_day_orders'] ?? 0 ?></strong></td>
-                                <td class="text-end text-muted"><?= $item['min_day_orders'] ?? 0 ?></td>
-                                <td class="text-center"><span class="badge bg-info"><?= round($item['consistency_score'] ?? 0, 0) ?>%</span></td>
+                                <td class="text-center"><span class="badge <?= $badge ?>"><?= $icon ?></span></td>
+                                <td><strong><?= htmlspecialchars($item['DSRCode']) ?></strong></td>
+                                <td><?= htmlspecialchars($item['ten_nv']) ?></td>
+                                <td><?= htmlspecialchars($item['MaGSBH'] ?? '-') ?></td>
+                                <td class="text-end"><?= number_format($item['avg_daily_customers'], 1) ?></td>
+                                <td class="text-end text-danger"><strong><?= $item['max_day_customers'] ?></strong></td>
+                                <td class="text-center">
+                                    <?php if ($item['violation_count'] > 0): ?>
+                                        <span class="violation-badge"><?= $item['violation_count'] ?></span>
+                                    <?php else: ?>
+                                        <span class="badge bg-success">OK</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="text-end">
-                                    <span style="padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; background: <?= ($risk_level === 'critical') ? '#ff6b6b' : (($risk_level === 'warning') ? '#ffc107' : '#28a745') ?>;">
-                                        <?= $item['risk_score'] ?? 0 ?>
+                                    <span style="padding: 5px 10px; border-radius: 5px; color: white; font-weight: bold; background: <?= ($item['risk_level'] === 'critical') ? '#dc3545' : (($item['risk_level'] === 'warning') ? '#ffc107' : '#28a745') ?>;">
+                                        <?= $item['risk_score'] ?>
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    <button class="btn btn-sm btn-outline-primary btn-detail" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#detailModal"
-                                            data-json="<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>">
-                                        <i class="fas fa-eye"></i> Chi Tiết
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick='showDetail(<?= htmlspecialchars(json_encode($item), ENT_QUOTES, 'UTF-8') ?>)'>
+                                        <i class="fas fa-eye"></i> Vi Phạm
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" 
+                                            onclick="loadCustomers('<?= $item['DSRCode'] ?>', '<?= $item['ten_nv'] ?>')">
+                                        <i class="fas fa-users"></i> Khách
                                     </button>
                                 </td>
                             </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="10" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
+                        <?php endforeach; else: ?>
+                            <tr><td colspan="9" class="text-center py-5 text-muted">Không có dữ liệu</td></tr>
                         <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
-
-                <?php if (!empty($debug_info)): ?>
-                <div class="debug-info">
-                    <strong>📊 Thông Tin:</strong> <?= htmlspecialchars($debug_info) ?>
-                </div>
-                <?php endif; ?>
             <?php endif; ?>
-
-            <!-- Action Buttons -->
-            <div class="btn-group-custom">
-                <a href="nhanvien_report.php" class="btn btn-info">
-                    <i class="fas fa-chart-line"></i> Báo Cáo Doanh Số
-                </a>
-                <a href="index.php" class="btn btn-success">
-                    <i class="fas fa-upload"></i> Upload File Mới
-                </a>
-                <a href="nhanvien_kpi.php" class="btn btn-secondary">
-                    <i class="fas fa-sync"></i> Làm Mới
-                </a>
-            </div>
         </div>
     </div>
 </div>
 
-<!-- Detail Modal -->
-<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<!-- Modal Vi Phạm -->
+<div class="modal fade" id="violationModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                <h5 class="modal-title"><i class="fas fa-chart-pie"></i> Chi Tiết KPI - <span id="modalEmpName"></span></h5>
+            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h5 class="modal-title">Chi Tiết Vi Phạm - <span id="violationEmpName"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="modalContent" style="max-height: 700px; overflow-y: auto;"></div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button></div>
+            <div class="modal-body" id="violationContent"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Khách Hàng -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white;">
+                <h5 class="modal-title">Danh Sách Khách Hàng - <span id="customerEmpName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="customerContent">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Đang tải dữ liệu...</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const detailButtons = document.querySelectorAll('.btn-detail');
-    detailButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const jsonStr = this.getAttribute('data-json');
-            if (jsonStr) showKPIDetails(jsonStr);
+// Hiển thị chi tiết vi phạm
+function showDetail(data) {
+    document.getElementById('violationEmpName').textContent = data.ten_nv;
+    
+    let html = `
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6>Vi Phạm</h6>
+                        <h3 class="text-danger">${data.violation_count} ngày</h3>
+                        <small>${data.risk_analysis.violation_rate}% thời gian</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6>Vượt Tối Đa</h6>
+                        <h3 class="text-warning">${data.risk_analysis.max_violation}</h3>
+                        <small>khách</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6>Liên Tục</h6>
+                        <h3 class="text-info">${data.risk_analysis.consecutive_violations}</h3>
+                        <small>ngày</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h6 class="border-bottom pb-2">Chi Tiết Các Ngày Vi Phạm</h6>
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Ngày</th>
+                        <th class="text-end">Số Khách</th>
+                        <th class="text-end">Ngưỡng</th>
+                        <th class="text-end">Vượt</th>
+                        <th class="text-end">% So Ngưỡng</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    if (data.risk_analysis.violation_days && data.risk_analysis.violation_days.length > 0) {
+        data.risk_analysis.violation_days.forEach(v => {
+            html += `
+                <tr>
+                    <td>${v.date}</td>
+                    <td class="text-end"><strong>${v.customers}</strong></td>
+                    <td class="text-end">${v.threshold}</td>
+                    <td class="text-end text-danger">+${v.violation}</td>
+                    <td class="text-end">${v.ratio}%</td>
+                </tr>
+            `;
         });
-    });
-});
-
-function showKPIDetails(jsonData) {
-    try {
-        const data = JSON.parse(jsonData);
-        
-        document.getElementById('modalEmpName').textContent = (data.ten_nv || 'N/A');
-        
-        const getScoreColor = (score) => score >= 75 ? '#ff6b6b' : (score >= 50 ? '#ffc107' : '#28a745');
-        const getRiskLevel = (score) => score >= 75 ? '🚨 CRITICAL' : (score >= 50 ? '⚠️ WARNING' : '✅ NORMAL');
-
-        let html = `
-            <div style="text-align: center; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <div style="font-size: 42px; font-weight: bold; color: ${getScoreColor(data.risk_score)};">${data.risk_score || 0}</div>
-                <div style="font-weight: bold; color: ${getScoreColor(data.risk_score)};">${getRiskLevel(data.risk_score)}</div>
-            </div>
-            
-            <div class="row mb-3">
-                <div class="col-6"><strong>Mã NV:</strong> ${escapeHtml(data.ma_nv)}</div>
-                <div class="col-6"><strong>Tổng Đơn:</strong> ${data.total_orders}</div>
-                <div class="col-6"><strong>TBD/Ngày:</strong> ${data.avg_daily_orders}</div>
-                <div class="col-6"><strong>Nhất Quán:</strong> ${data.consistency_score}%</div>
-            </div>
-
-            <h6 class="border-bottom pb-2">Lý Do:</h6>
-            <ul class="text-danger small">
-        `;
-        
-        if (data.risk_reasons && data.risk_reasons.length > 0) {
-            data.risk_reasons.forEach(r => html += `<li>${escapeHtml(r)}</li>`);
-        } else {
-            html += `<li class="text-success">Hoạt động bình thường</li>`;
-        }
-        html += `</ul>`;
-
-        document.getElementById('modalContent').innerHTML = html;
-    } catch (e) {
-        console.error('Detail Error:', e);
-        document.getElementById('modalContent').innerHTML = '<div class="alert alert-danger">Lỗi hiển thị dữ liệu: ' + e.message + '</div>';
+    } else {
+        html += '<tr><td colspan="5" class="text-center text-success">Không có vi phạm</td></tr>';
     }
+    
+    html += '</tbody></table></div>';
+    
+    document.getElementById('violationContent').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('violationModal')).show();
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+// Load danh sách khách hàng (AJAX)
+function loadCustomers(dsrCode, empName) {
+    document.getElementById('customerEmpName').textContent = empName;
+    document.getElementById('customerContent').innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary"></div>
+            <p class="mt-2">Đang tải danh sách khách hàng...</p>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('customerModal'));
+    modal.show();
+    
+    const params = new URLSearchParams({
+        action: 'get_customers',
+        dsr_code: dsrCode,
+        tu_ngay: '<?= $filters['tu_ngay'] ?? '' ?>',
+        den_ngay: '<?= $filters['den_ngay'] ?? '' ?>',
+        product_filter: '<?= $filters['product_filter'] ?? '' ?>'
+    });
+    
+    fetch(`nhanvien_kpi.php?${params}`)
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                renderCustomers(result.data);
+            } else {
+                document.getElementById('customerContent').innerHTML = `
+                    <div class="alert alert-danger">Lỗi: ${result.error}</div>
+                `;
+            }
+        })
+        .catch(err => {
+            document.getElementById('customerContent').innerHTML = `
+                <div class="alert alert-danger">Lỗi kết nối: ${err.message}</div>
+            `;
+        });
+}
+
+function renderCustomers(customers) {
+    if (!customers || customers.length === 0) {
+        document.getElementById('customerContent').innerHTML = `
+            <div class="alert alert-info">Không có khách hàng trong khoảng thời gian này</div>
+        `;
+        return;
+    }
+    
+    let html = `<div class="mb-3"><strong>Tổng: ${customers.length} khách hàng</strong></div>`;
+    
+    customers.forEach((c, idx) => {
+        html += `
+            <div class="customer-row">
+                <div class="row">
+                    <div class="col-md-8">
+                        <strong>${idx + 1}. ${c.customer_name || c.CustCode}</strong>
+                        <div class="text-muted small">${c.customer_address || '-'} | ${c.customer_province || '-'}</div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div><strong>${formatMoney(c.total_amount)}</strong></div>
+                        <div class="text-muted small">${c.order_count} đơn hàng</div>
+                    </div>
+                </div>
+                <div class="mt-2">
+        `;
+        
+        if (c.orders && c.orders.length > 0) {
+            c.orders.forEach(o => {
+                html += `<span class="order-chip">${o.date}: ${o.order_number} (${formatMoney(o.amount)})</span>`;
+            });
+        }
+        
+        html += `</div></div>`;
+    });
+    
+    document.getElementById('customerContent').innerHTML = html;
+}
+
+function formatMoney(val) {
+    return parseFloat(val).toLocaleString('vi-VN') + 'đ';
 }
 </script>
 </body>
