@@ -1547,5 +1547,256 @@ function adjustColor(color, percent) {
         .toString(16).slice(1);
 }
 </script>
+
+<!-- ✅ THÊM VÀO CUỐI FILE views/detail.php TRƯỚC </body> -->
+
+<script>
+/**
+ * ========================================
+ * FIX MODAL FREEZE BUG
+ * ========================================
+ * Vấn đề: Sau khi đóng modal, trang bị freeze (không thao tác được)
+ * Nguyên nhân: 
+ * 1. Backdrop không bị remove
+ * 2. Body class 'modal-open' không bị xóa
+ * 3. Body style 'overflow: hidden' vẫn còn
+ * 4. Event listener bị treo
+ * 
+ * Giải pháp: Force cleanup mọi thứ khi modal đóng
+ */
+
+(function() {
+    'use strict';
+    
+    // ============================================
+    // 1. GLOBAL CLEANUP FUNCTION
+    // ============================================
+    function forceModalCleanup() {
+        // Remove all backdrops
+        document.querySelectorAll('.modal-backdrop').forEach(el => {
+            el.remove();
+        });
+        
+        // Remove modal-open class from body
+        document.body.classList.remove('modal-open');
+        
+        // Reset body styles
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        
+        // Remove any stuck modals
+        document.querySelectorAll('.modal.show').forEach(modal => {
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+        });
+        
+        console.log('✅ Modal cleanup completed');
+    }
+    
+    // ============================================
+    // 2. ATTACH CLEANUP TO ALL MODALS
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        const modals = document.querySelectorAll('.modal');
+        
+        modals.forEach(function(modalElement) {
+            // On modal hidden event
+            modalElement.addEventListener('hidden.bs.modal', function() {
+                console.log('Modal hidden event fired for:', modalElement.id);
+                
+                // Delay cleanup slightly to ensure Bootstrap finishes
+                setTimeout(forceModalCleanup, 100);
+            });
+            
+            // On modal hide event (before hidden)
+            modalElement.addEventListener('hide.bs.modal', function() {
+                console.log('Modal hide event fired for:', modalElement.id);
+            });
+        });
+        
+        // ============================================
+        // 3. CLOSE BUTTON OVERRIDE
+        // ============================================
+        document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                console.log('Close button clicked');
+                
+                // Force cleanup after 200ms
+                setTimeout(forceModalCleanup, 200);
+            });
+        });
+        
+        // ============================================
+        // 4. ESC KEY HANDLER
+        // ============================================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const openModals = document.querySelectorAll('.modal.show');
+                if (openModals.length > 0) {
+                    console.log('ESC pressed, closing modals');
+                    setTimeout(forceModalCleanup, 200);
+                }
+            }
+        });
+        
+        // ============================================
+        // 5. BACKDROP CLICK HANDLER
+        // ============================================
+        document.querySelectorAll('.modal').forEach(function(modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    console.log('Backdrop clicked');
+                    setTimeout(forceModalCleanup, 200);
+                }
+            });
+        });
+        
+        console.log('✅ Modal freeze fix initialized');
+    });
+    
+    // ============================================
+    // 6. EMERGENCY CLEANUP ON WINDOW FOCUS
+    // ============================================
+    window.addEventListener('focus', function() {
+        const hasBackdrop = document.querySelector('.modal-backdrop');
+        const hasModalOpen = document.body.classList.contains('modal-open');
+        const hasVisibleModal = document.querySelector('.modal.show');
+        
+        if ((hasBackdrop || hasModalOpen) && !hasVisibleModal) {
+            console.warn('⚠️ Detected stuck modal state, cleaning up...');
+            forceModalCleanup();
+        }
+    });
+    
+    // ============================================
+    // 7. EXPOSE CLEANUP FUNCTION GLOBALLY
+    // ============================================
+    window.forceModalCleanup = forceModalCleanup;
+    
+})();
+
+/**
+ * ========================================
+ * ENHANCED showAnomalyDetailModal
+ * ========================================
+ * Thêm cleanup vào hàm mở modal
+ */
+function showAnomalyDetailModal(data) {
+    // Cleanup trước khi mở modal mới
+    if (typeof window.forceModalCleanup === 'function') {
+        window.forceModalCleanup();
+    }
+    
+    const config = anomalyConfig[data.type];
+    if (!config) {
+        console.error('Không tìm thấy config cho type:', data.type);
+        return;
+    }
+    
+    const metrics = data.metrics || {};
+    const modal = document.getElementById('anomalyDetailModal');
+    if (!modal) {
+        console.error('Không tìm thấy modal');
+        return;
+    }
+    
+    // Update header
+    document.getElementById('modalTitle').innerHTML = `${config.icon} ${config.title}`;
+    document.getElementById('modalSubtitle').textContent = 
+        `Chỉ số: ${data.type} | Trọng số: ${data.weight}% | Điểm: ${data.weighted_score.toFixed(1)}`;
+    modal.querySelector('.modal-header').style.background = 
+        `linear-gradient(135deg, ${config.color} 0%, ${adjustColor(config.color, -20)} 100%)`;
+    
+    // ... (giữ nguyên phần update content)
+    document.getElementById('anomaly-explanation').textContent = config.getExplanation(metrics);
+    
+    const metricCards = getMetricCards(data.type, metrics);
+    document.getElementById('anomaly-metrics').innerHTML = metricCards.map(m => `
+        <div class="metric-card" style="${m.highlight ? 'border-left-color: ' + config.color + ';' : ''}">
+            <div class="metric-label">${m.label}</div>
+            <div class="metric-value" style="${m.highlight ? 'color: ' + config.color + ';' : ''}">
+                ${m.value}<span class="metric-unit">${m.unit}</span>
+            </div>
+        </div>
+    `).join('');
+    
+    const tableBody = document.querySelector('#anomaly-data-table tbody');
+    tableBody.innerHTML = config.renderEvidence(metrics.evidence);
+    
+    document.getElementById('anomaly-formula').innerHTML = getFormula(data.type, metrics);
+    
+    const actionsList = document.getElementById('anomaly-actions');
+    actionsList.innerHTML = getActions(data.type).map(a => `<li>${a}</li>`).join('');
+    
+    // ✅ IMPROVED: Mở modal với error handling
+    try {
+        const bsModal = new bootstrap.Modal(modal, {
+            backdrop: 'static', // Prevent close on backdrop click initially
+            keyboard: true
+        });
+        
+        // Add cleanup on close
+        modal.addEventListener('hidden.bs.modal', function handler() {
+            console.log('✅ Anomaly modal closed, cleaning up...');
+            window.forceModalCleanup();
+            modal.removeEventListener('hidden.bs.modal', handler);
+        }, { once: true });
+        
+        bsModal.show();
+        console.log('✅ Modal opened successfully');
+        
+    } catch (error) {
+        console.error('❌ Error opening modal:', error);
+        window.forceModalCleanup();
+    }
+}
+
+/**
+ * ========================================
+ * CONSOLE HELPER
+ * ========================================
+ * Cho phép user test cleanup từ console
+ */
+console.log('%c🔧 Modal Fix Loaded', 'color: #28a745; font-size: 14px; font-weight: bold;');
+console.log('%cĐể force cleanup modal, gõ: window.forceModalCleanup()', 'color: #666;');
+</script>
+
+<style>
+/**
+ * ========================================
+ * CSS FIX: Prevent scroll issues
+ * ========================================
+ */
+.modal.show {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.modal-backdrop {
+    /* Ensure backdrop is always below modals */
+    z-index: 1040;
+}
+
+.modal {
+    /* Ensure modals are above backdrop */
+    z-index: 1050;
+}
+
+/* Fix for body when modal is open */
+body.modal-open {
+    overflow: hidden !important;
+    padding-right: 0 !important;
+}
+
+/* Ensure backdrop removal animation */
+.modal-backdrop.fade {
+    transition: opacity 0.15s linear;
+}
+
+.modal-backdrop.show {
+    opacity: 0.5;
+}
+</style>
 </body>
 </html>
