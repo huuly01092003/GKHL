@@ -335,12 +335,8 @@ class AnomalyDetectionModel {
                 o.RptYear,
                 o.RptMonth,
                 SUM(o.TotalNetAmount) as monthly_sales,
-                COUNT(DISTINCT o.OrderNumber) as monthly_orders,
-                GROUP_CONCAT(DISTINCT o.OrderNumber ORDER BY o.OrderDate SEPARATOR ', ') as order_codes,
-                GROUP_CONCAT(DISTINCT o.DSRCode ORDER BY o.OrderDate SEPARATOR ', ') as staff_codes,
-                GROUP_CONCAT(DISTINCT d.TenNVBH ORDER BY o.OrderDate SEPARATOR ', ') as staff_names
+                COUNT(DISTINCT o.OrderNumber) as monthly_orders
             FROM orderdetail o
-            LEFT JOIN dskh d ON o.DSRCode = d.MaNVBH
             WHERE o.CustCode = ?
             AND (
                 (o.RptYear = ? AND o.RptMonth <= ?)
@@ -352,96 +348,187 @@ class AnomalyDetectionModel {
     
     $stmt = $this->conn->prepare($sql);
     $stmt->execute([$custCode, $minYear, $minMonth, $minYear, $minMonth]);
-    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $monthlyResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    if (empty($results)) return [];
+    if (empty($monthlyResults)) return [];
     
-    $baseline = $results[0]['monthly_sales'] ?? 0;
+    $baseline = $monthlyResults[0]['monthly_sales'] ?? 0;
     
-    foreach ($results as &$row) {
+    // ✅ Lấy chi tiết đơn hàng cho từng tháng
+    foreach ($monthlyResults as &$row) {
         $row['period'] = "Tháng {$row['RptMonth']}/{$row['RptYear']}";
         $row['value'] = number_format($row['monthly_sales'], 0, ',', '.');
         
-        // ✅ NEW: Add enriched data
-        $row['orders'] = array_filter(explode(', ', $row['order_codes'] ?? ''));
-        $row['staff_codes'] = array_filter(explode(', ', $row['staff_codes'] ?? ''));
-        $row['staff_names'] = array_filter(explode(', ', $row['staff_names'] ?? ''));
-        
+        // Calculate comparison
         if ($baseline > 0 && $row['monthly_sales'] != $baseline) {
             $change = (($row['monthly_sales'] - $baseline) / $baseline) * 100;
             $row['comparison'] = ($change >= 0 ? '+' : '') . round($change, 1) . '%';
         } else {
             $row['comparison'] = 'Baseline';
         }
+        
+        // ✅ LẤY CHI TIẾT ĐƠN HÀNG CỦA THÁNG NÀY
+        $row['orders'] = $this->getOrderDetailsForMonth(
+            $custCode, 
+            $row['RptYear'], 
+            $row['RptMonth']
+        );
+    }
+    
+    return $monthlyResults;
+}
+
+private function getOrderDetailsForMonth($custCode, $year, $month) {
+    $sql = "SELECT DISTINCT
+                DATE(o.OrderDate) as order_date,
+                o.OrderNumber as order_code,
+                o.DSRCode as emp_code,
+                d.TenNVBH as emp_name,
+                o.TotalNetAmount as order_amount
+            FROM orderdetail o
+            LEFT JOIN dskh d ON o.DSRCode = d.MaNVBH
+            WHERE o.CustCode = ?
+            AND o.RptYear = ?
+            AND o.RptMonth = ?
+            GROUP BY DATE(o.OrderDate), o.OrderNumber, o.DSRCode, d.TenNVBH, o.TotalNetAmount
+            ORDER BY o.OrderDate ASC, o.OrderNumber ASC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$custCode, $year, $month]);
+    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Format data theo cấu trúc JSON mong muốn
+    $formattedOrders = [];
+    foreach ($orders as $order) {
+        $formattedOrders[] = [
+            'order_date' => $order['order_date'],
+            'order_code' => $order['order_code'],
+            'order_amount' => $order['order_amount'],
+            'employee' => [
+                'emp_code' => $order['emp_code'] ?? 'N/A',
+                'emp_name' => $order['emp_name'] ?? 'N/A'
+            ]
+        ];
+    }
+    
+    return $formattedOrders;
+}
+
+
+    /**
+     * 2️⃣ Lịch sử giao dịch với khoảng trống (Return After Long Break)
+     */
+    private function getPurchaseHistory($custCode, $monthsBack = 24) {
+    $sql = "SELECT 
+                RptYear,
+                RptMonth,
+                SUM(TotalNetAmount) as monthly_sales,
+                COUNT(DISTINCT OrderNumber) as monthly_orders
+            FROM orderdetail
+            WHERE CustCode = ?
+            AND OrderDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+            GROUP BY RptYear, RptMonth
+            ORDER BY RptYear DESC, RptMonth DESC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$custCode, $monthsBack]);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($results as &$row) {
+        $row['period'] = "Tháng {$row['RptMonth']}/{$row['RptYear']}";
+        $row['value'] = number_format($row['monthly_sales'], 0, ',', '.');
+        $row['comparison'] = "{$row['monthly_orders']} đơn";
+        
+        // ✅ Thêm chi tiết đơn hàng
+        $row['orders'] = $this->getOrderDetailsForMonth(
+            $custCode, 
+            $row['RptYear'], 
+            $row['RptMonth']
+        );
     }
     
     return $results;
 }
 
     /**
-     * 2️⃣ Lịch sử giao dịch với khoảng trống (Return After Long Break)
-     */
-    private function getPurchaseHistory($custCode, $monthsBack = 24) {
-        $sql = "SELECT 
-                    RptYear,
-                    RptMonth,
-                    SUM(TotalNetAmount) as monthly_sales,
-                    COUNT(DISTINCT OrderNumber) as monthly_orders
-                FROM orderdetail
-                WHERE CustCode = ?
-                AND OrderDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-                GROUP BY RptYear, RptMonth
-                ORDER BY RptYear DESC, RptMonth DESC";
-        
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute([$custCode, $monthsBack]);
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        foreach ($results as &$row) {
-            $row['period'] = "Tháng {$row['RptMonth']}/{$row['RptYear']}";
-            $row['value'] = number_format($row['monthly_sales'], 0, ',', '.');
-            $row['orders'] = $row['monthly_orders'];
-        }
-        
-        return $results;
-    }
-
-    /**
      * 3️⃣ Chi tiết đơn hàng theo ngày trong tháng (Checkpoint Rush)
      */
     private function getOrdersByDayOfMonth($custCode, $years, $months) {
-        $yearPlaceholders = implode(',', array_fill(0, count($years), '?'));
-        $monthPlaceholders = implode(',', array_fill(0, count($months), '?'));
+    $yearPlaceholders = implode(',', array_fill(0, count($years), '?'));
+    $monthPlaceholders = implode(',', array_fill(0, count($months), '?'));
+    
+    $sql = "SELECT 
+                DAY(OrderDate) as day_of_month,
+                DATE(OrderDate) as order_date,
+                COUNT(DISTINCT OrderNumber) as order_count,
+                SUM(TotalNetAmount) as daily_amount,
+                CASE 
+                    WHEN DAY(OrderDate) BETWEEN 12 AND 14 THEN 'Giữa tháng'
+                    WHEN DAY(OrderDate) BETWEEN 26 AND 28 THEN 'Cuối tháng'
+                    ELSE 'Ngày thường'
+                END as checkpoint_type
+            FROM orderdetail
+            WHERE CustCode = ?
+            AND RptYear IN ($yearPlaceholders)
+            AND RptMonth IN ($monthPlaceholders)
+            GROUP BY DAY(OrderDate), DATE(OrderDate)
+            ORDER BY order_count DESC";
+    
+    $params = array_merge([$custCode], $years, $months);
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute($params);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($results as &$row) {
+        $row['period'] = "Ngày {$row['day_of_month']}";
+        $row['value'] = number_format($row['daily_amount'], 0, ',', '.');
+        $row['comparison'] = "{$row['order_count']} đơn - {$row['checkpoint_type']}";
         
-        $sql = "SELECT 
-                    DAY(OrderDate) as day_of_month,
-                    COUNT(DISTINCT OrderNumber) as order_count,
-                    SUM(TotalNetAmount) as daily_amount,
-                    CASE 
-                        WHEN DAY(OrderDate) BETWEEN 12 AND 14 THEN 'Giữa tháng'
-                        WHEN DAY(OrderDate) BETWEEN 26 AND 28 THEN 'Cuối tháng'
-                        ELSE 'Ngày thường'
-                    END as checkpoint_type
-                FROM orderdetail
-                WHERE CustCode = ?
-                AND RptYear IN ($yearPlaceholders)
-                AND RptMonth IN ($monthPlaceholders)
-                GROUP BY DAY(OrderDate)
-                ORDER BY order_count DESC";
-        
-        $params = array_merge([$custCode], $years, $months);
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($params);
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        foreach ($results as &$row) {
-            $row['period'] = "Ngày {$row['day_of_month']}";
-            $row['value'] = number_format($row['daily_amount'], 0, ',', '.');
-            $row['comparison'] = "{$row['order_count']} đơn - {$row['checkpoint_type']}";
-        }
-        
-        return $results;
+        // ✅ Lấy chi tiết đơn hàng của ngày này
+        $row['orders'] = $this->getOrderDetailsForDate(
+            $custCode,
+            $row['order_date']
+        );
     }
+    
+    return $results;
+}
+
+private function getOrderDetailsForDate($custCode, $orderDate) {
+    $sql = "SELECT DISTINCT
+                o.OrderNumber as order_code,
+                o.DSRCode as emp_code,
+                d.TenNVBH as emp_name,
+                o.TotalNetAmount as order_amount,
+                TIME(o.OrderDate) as order_time
+            FROM orderdetail o
+            LEFT JOIN dskh d ON o.DSRCode = d.MaNVBH
+            WHERE o.CustCode = ?
+            AND DATE(o.OrderDate) = ?
+            GROUP BY o.OrderNumber, o.DSRCode, d.TenNVBH, o.TotalNetAmount, TIME(o.OrderDate)
+            ORDER BY o.OrderDate ASC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$custCode, $orderDate]);
+    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $formattedOrders = [];
+    foreach ($orders as $order) {
+        $formattedOrders[] = [
+            'order_date' => $orderDate,
+            'order_time' => $order['order_time'],
+            'order_code' => $order['order_code'],
+            'order_amount' => $order['order_amount'],
+            'employee' => [
+                'emp_code' => $order['emp_code'] ?? 'N/A',
+                'emp_name' => $order['emp_name'] ?? 'N/A'
+            ]
+        ];
+    }
+    
+    return $formattedOrders;
+}
+
 
     /**
      * 4️⃣ Phân bổ sản phẩm (Product Concentration)
@@ -541,140 +628,166 @@ class AnomalyDetectionModel {
      * 6️⃣ Chi tiết đơn hàng theo ngày (Burst Orders)
      */
     private function getDailyOrdersDetail($custCode, $years, $months) {
-        $yearPlaceholders = implode(',', array_fill(0, count($years), '?'));
-        $monthPlaceholders = implode(',', array_fill(0, count($months), '?'));
+    $yearPlaceholders = implode(',', array_fill(0, count($years), '?'));
+    $monthPlaceholders = implode(',', array_fill(0, count($months), '?'));
+    
+    $sql = "SELECT 
+                DATE(OrderDate) as order_date,
+                COUNT(DISTINCT OrderNumber) as order_count,
+                SUM(TotalNetAmount) as daily_sales
+            FROM orderdetail
+            WHERE CustCode = ?
+            AND RptYear IN ($yearPlaceholders)
+            AND RptMonth IN ($monthPlaceholders)
+            GROUP BY DATE(OrderDate)
+            ORDER BY order_count DESC
+            LIMIT 20";
+    
+    $params = array_merge([$custCode], $years, $months);
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute($params);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($results as &$row) {
+        $row['period'] = date('d/m/Y', strtotime($row['order_date']));
+        $row['value'] = number_format($row['daily_sales'], 0, ',', '.');
+        $row['comparison'] = "{$row['order_count']} đơn";
         
-        $sql = "SELECT 
-                    DATE(OrderDate) as order_date,
-                    COUNT(DISTINCT OrderNumber) as order_count,
-                    SUM(TotalNetAmount) as daily_sales
-                FROM orderdetail
-                WHERE CustCode = ?
-                AND RptYear IN ($yearPlaceholders)
-                AND RptMonth IN ($monthPlaceholders)
-                GROUP BY DATE(OrderDate)
-                ORDER BY order_count DESC
-                LIMIT 20";
-        
-        $params = array_merge([$custCode], $years, $months);
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($params);
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        foreach ($results as &$row) {
-            $row['period'] = date('d/m/Y', strtotime($row['order_date']));
-            $row['value'] = number_format($row['daily_sales'], 0, ',', '.');
-            $row['comparison'] = "{$row['order_count']} đơn";
-        }
-        
-        return $results;
+        // ✅ Thêm chi tiết đơn hàng
+        $row['orders'] = $this->getOrderDetailsForDate(
+            $custCode,
+            $row['order_date']
+        );
     }
+    
+    return $results;
+}
 
     /**
      * 7️⃣ Phân bố giá trị đơn hàng (High Value Outlier)
      */
     private function getOrderValueDistribution($custCode, $years, $months) {
-        $yearPlaceholders = implode(',', array_fill(0, count($years), '?'));
-        $monthPlaceholders = implode(',', array_fill(0, count($months), '?'));
+    $yearPlaceholders = implode(',', array_fill(0, count($years), '?'));
+    $monthPlaceholders = implode(',', array_fill(0, count($months), '?'));
+    
+    $sql = "SELECT 
+                o.OrderNumber,
+                DATE(o.OrderDate) as order_date,
+                o.TotalNetAmount,
+                o.DSRCode as emp_code,
+                d.TenNVBH as emp_name
+            FROM orderdetail o
+            LEFT JOIN dskh d ON o.DSRCode = d.MaNVBH
+            WHERE o.CustCode = ?
+            AND o.RptYear IN ($yearPlaceholders)
+            AND o.RptMonth IN ($monthPlaceholders)
+            GROUP BY o.OrderNumber, DATE(o.OrderDate), o.TotalNetAmount, o.DSRCode, d.TenNVBH
+            ORDER BY o.TotalNetAmount DESC
+            LIMIT 10";
+    
+    $params = array_merge([$custCode], $years, $months);
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute($params);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($results as &$row) {
+        $row['period'] = date('d/m/Y', strtotime($row['order_date']));
+        $row['value'] = number_format($row['TotalNetAmount'], 0, ',', '.');
+        $row['comparison'] = "Đơn: {$row['OrderNumber']}";
         
-        $sql = "SELECT 
-                    OrderNumber,
-                    OrderDate,
-                    TotalNetAmount
-                FROM orderdetail
-                WHERE CustCode = ?
-                AND RptYear IN ($yearPlaceholders)
-                AND RptMonth IN ($monthPlaceholders)
-                GROUP BY OrderNumber, OrderDate, TotalNetAmount
-                ORDER BY TotalNetAmount DESC
-                LIMIT 10";
-        
-        $params = array_merge([$custCode], $years, $months);
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($params);
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        foreach ($results as &$row) {
-            $row['period'] = "Đơn: {$row['OrderNumber']}";
-            $row['value'] = number_format($row['TotalNetAmount'], 0, ',', '.');
-            $row['comparison'] = date('d/m/Y', strtotime($row['OrderDate']));
-        }
-        
-        return $results;
+        // ✅ Format as orders array for consistency
+        $row['orders'] = [[
+            'order_date' => $row['order_date'],
+            'order_code' => $row['OrderNumber'],
+            'order_amount' => $row['TotalNetAmount'],
+            'employee' => [
+                'emp_code' => $row['emp_code'] ?? 'N/A',
+                'emp_name' => $row['emp_name'] ?? 'N/A'
+            ]
+        ]];
     }
+    
+    return $results;
+}
+
 
     /**
      * 8️⃣ So sánh trước và sau spike (No Purchase After Spike)
      */
     private function getSpikeComparison($custCode, $years, $months) {
-        $maxYear = max($years);
-        $maxMonth = max($months);
-        
-        // Lấy kỳ spike
-        $sql1 = "SELECT 
-                    RptYear,
-                    RptMonth,
-                    SUM(TotalNetAmount) as sales,
-                    COUNT(DISTINCT OrderNumber) as orders
-                FROM orderdetail
-                WHERE CustCode = ?
-                AND RptYear IN (" . implode(',', array_fill(0, count($years), '?')) . ")
-                AND RptMonth IN (" . implode(',', array_fill(0, count($months), '?')) . ")
-                GROUP BY RptYear, RptMonth";
-        
-        $params1 = array_merge([$custCode], $years, $months);
-        $stmt1 = $this->conn->prepare($sql1);
-        $stmt1->execute($params1);
-        $spike = $stmt1->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Lấy 3 tháng sau
-        $sql2 = "SELECT 
-                    RptYear,
-                    RptMonth,
-                    SUM(TotalNetAmount) as sales,
-                    COUNT(DISTINCT OrderNumber) as orders
-                FROM orderdetail
-                WHERE CustCode = ?
-                AND (
-                    (RptYear = ? AND RptMonth > ?)
-                    OR (RptYear = ? + 1 AND RptMonth <= 3)
-                )
-                GROUP BY RptYear, RptMonth
-                ORDER BY RptYear, RptMonth
-                LIMIT 3";
-        
-        $stmt2 = $this->conn->prepare($sql2);
-        $stmt2->execute([$custCode, $maxYear, $maxMonth, $maxYear]);
-        $after = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-        
-        $results = [];
-        
-        foreach ($spike as $row) {
-            $results[] = [
-                'period' => "Tháng {$row['RptMonth']}/{$row['RptYear']} (Spike)",
-                'value' => number_format($row['sales'], 0, ',', '.'),
-                'comparison' => "{$row['orders']} đơn"
-            ];
-        }
-        
-        foreach ($after as $row) {
-            $results[] = [
-                'period' => "Tháng {$row['RptMonth']}/{$row['RptYear']} (Sau spike)",
-                'value' => number_format($row['sales'], 0, ',', '.'),
-                'comparison' => "{$row['orders']} đơn"
-            ];
-        }
-        
-        if (empty($after)) {
-            $results[] = [
-                'period' => 'Các tháng sau spike',
-                'value' => '0',
-                'comparison' => 'Không có giao dịch'
-            ];
-        }
-        
-        return $results;
+    $maxYear = max($years);
+    $maxMonth = max($months);
+    
+    // Lấy kỳ spike
+    $sql1 = "SELECT 
+                RptYear,
+                RptMonth,
+                SUM(TotalNetAmount) as sales,
+                COUNT(DISTINCT OrderNumber) as orders
+            FROM orderdetail
+            WHERE CustCode = ?
+            AND RptYear IN (" . implode(',', array_fill(0, count($years), '?')) . ")
+            AND RptMonth IN (" . implode(',', array_fill(0, count($months), '?')) . ")
+            GROUP BY RptYear, RptMonth";
+    
+    $params1 = array_merge([$custCode], $years, $months);
+    $stmt1 = $this->conn->prepare($sql1);
+    $stmt1->execute($params1);
+    $spike = $stmt1->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Lấy 3 tháng sau
+    $sql2 = "SELECT 
+                RptYear,
+                RptMonth,
+                SUM(TotalNetAmount) as sales,
+                COUNT(DISTINCT OrderNumber) as orders
+            FROM orderdetail
+            WHERE CustCode = ?
+            AND (
+                (RptYear = ? AND RptMonth > ?)
+                OR (RptYear = ? + 1 AND RptMonth <= 3)
+            )
+            GROUP BY RptYear, RptMonth
+            ORDER BY RptYear, RptMonth
+            LIMIT 3";
+    
+    $stmt2 = $this->conn->prepare($sql2);
+    $stmt2->execute([$custCode, $maxYear, $maxMonth, $maxYear]);
+    $after = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    
+    $results = [];
+    
+    // ✅ Format spike period với chi tiết đơn hàng
+    foreach ($spike as $row) {
+        $results[] = [
+            'period' => "Tháng {$row['RptMonth']}/{$row['RptYear']} (Spike)",
+            'value' => number_format($row['sales'], 0, ',', '.'),
+            'comparison' => "{$row['orders']} đơn",
+            'orders' => $this->getOrderDetailsForMonth($custCode, $row['RptYear'], $row['RptMonth'])
+        ];
     }
+    
+    // ✅ Format after spike period với chi tiết đơn hàng
+    foreach ($after as $row) {
+        $results[] = [
+            'period' => "Tháng {$row['RptMonth']}/{$row['RptYear']} (Sau spike)",
+            'value' => number_format($row['sales'], 0, ',', '.'),
+            'comparison' => "{$row['orders']} đơn",
+            'orders' => $this->getOrderDetailsForMonth($custCode, $row['RptYear'], $row['RptMonth'])
+        ];
+    }
+    
+    if (empty($after)) {
+        $results[] = [
+            'period' => 'Các tháng sau spike',
+            'value' => '0',
+            'comparison' => 'Không có giao dịch',
+            'orders' => []
+        ];
+    }
+    
+    return $results;
+}
 
     // ============================================
     // CÁC HÀM KIỂM TRA DẤU HIỆU (GIỮ NGUYÊN)

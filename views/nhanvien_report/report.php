@@ -1,5 +1,9 @@
 
-
+<?php
+$currentPage = 'import';
+require_once dirname(__DIR__) . '/components/navbar.php';
+renderNavbar($currentPage);
+?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>

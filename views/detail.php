@@ -1027,70 +1027,74 @@ const anomalyConfig = {
             }
             
             return evidence.map(row => {
-                // ✅ PARSE dữ liệu từ backend
-                const orders = row.orders || [];
-                const staffCodes = row.staff_codes || [];
-                const staffNames = row.staff_names || [];
-                
-                // Display orders
-                let orderDisplay = 'N/A';
-                if (orders.length > 0) {
-                    orderDisplay = orders.slice(0, 3).map(o => 
-                        `<code style="background: #e3f2fd; padding: 2px 6px; border-radius: 3px; margin: 2px; font-size: 0.8rem;">${o}</code>`
-                    ).join(' ');
-                    
-                    if (orders.length > 3) {
-                        orderDisplay += `<br><small class="text-muted">+${orders.length - 3} đơn nữa</small>`;
-                    }
-                }
-                
-                // Display employees (unique)
-                let employeeDisplay = 'N/A';
-                if (staffCodes.length > 0) {
-                    const uniqueEmployees = [];
-                    const seen = new Set();
-                    
-                    staffCodes.forEach((code, idx) => {
-                        if (!seen.has(code) && code !== 'N/A') {
-                            seen.add(code);
-                            uniqueEmployees.push({
-                                code: code,
-                                name: staffNames[idx] || 'N/A'
-                            });
-                        }
-                    });
-                    
-                    if (uniqueEmployees.length > 0) {
-                        employeeDisplay = uniqueEmployees.slice(0, 2).map(e => 
-                            `<div style="margin-bottom: 3px;">
-                                <span style="color: #667eea; font-weight: 500;">${e.code}</span>
-                                <br><small class="text-muted">${e.name}</small>
-                            </div>`
-                        ).join('');
-                        
-                        if (uniqueEmployees.length > 2) {
-                            employeeDisplay += `<small class="text-muted">+${uniqueEmployees.length - 2} NV khác</small>`;
-                        }
-                    }
-                }
-                
-                return `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px; font-weight: 500;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;">${row.comparison}</td>
-                    <td style="padding: 10px; vertical-align: top;">
-                        <div style="margin-bottom: 5px;">
-                            <strong style="font-size: 0.75rem; color: #666;">📦 Đơn hàng:</strong><br>
-                            ${orderDisplay}
-                        </div>
-                        <div>
-                            <strong style="font-size: 0.75rem; color: #666;">👤 Nhân viên:</strong><br>
-                            ${employeeDisplay}
+                let html = `
+                <tr style="border-bottom: 2px solid #ddd; background: #f8f9fa;">
+                    <td style="padding: 12px; font-weight: 600; vertical-align: top;" rowspan="${(row.orders?.length || 0) + 1}">
+                        ${row.period}
+                    </td>
+                    <td style="padding: 12px; font-weight: 700; vertical-align: top;" rowspan="${(row.orders?.length || 0) + 1}">
+                        ${row.value}
+                    </td>
+                    <td style="padding: 12px; vertical-align: top;" rowspan="${(row.orders?.length || 0) + 1}">
+                        ${row.comparison}
+                    </td>
+                    <td style="padding: 12px;">
+                        <div style="font-weight: 600; color: #667eea; margin-bottom: 5px;">
+                            📦 Chi tiết ${row.orders?.length || 0} đơn hàng:
                         </div>
                     </td>
-                </tr>
-                `;
+                </tr>`;
+                
+                // ✅ HIỂN THỊ TỪNG ĐƠN HÀNG
+                if (row.orders && row.orders.length > 0) {
+                    row.orders.forEach((order, idx) => {
+                        const orderDate = order.order_date ? 
+                            new Date(order.order_date).toLocaleDateString('vi-VN') : 'N/A';
+                        const orderTime = order.order_time || '';
+                        
+                        html += `
+                        <tr style="border-bottom: 1px solid #eee; ${idx % 2 === 0 ? 'background: #fff;' : 'background: #fafafa;'}">
+                            <td style="padding: 8px 12px;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                    <div style="min-width: 90px;">
+                                        <i class="fas fa-calendar-day" style="color: #28a745; margin-right: 5px;"></i>
+                                        <strong style="color: #28a745;">${orderDate}</strong>
+                                        ${orderTime ? `<small style="color: #999; margin-left: 3px;">${orderTime}</small>` : ''}
+                                    </div>
+                                    <div style="min-width: 100px;">
+                                        <i class="fas fa-file-invoice" style="color: #667eea; margin-right: 5px;"></i>
+                                        <code style="background: #e3f2fd; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+                                            ${order.order_code || 'N/A'}
+                                        </code>
+                                    </div>
+                                    <div style="min-width: 120px;">
+                                        <i class="fas fa-user-tie" style="color: #fd7e14; margin-right: 5px;"></i>
+                                        <span style="color: #fd7e14; font-weight: 500;">${order.employee?.emp_code || 'N/A'}</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <i class="fas fa-id-badge" style="color: #6c757d; margin-right: 5px;"></i>
+                                        <span style="color: #333;">${order.employee?.emp_name || 'N/A'}</span>
+                                    </div>
+                                    ${order.order_amount ? `
+                                    <div style="min-width: 100px; text-align: right;">
+                                        <i class="fas fa-dollar-sign" style="color: #28a745; margin-right: 3px;"></i>
+                                        <strong style="color: #28a745;">${parseFloat(order.order_amount).toLocaleString('vi-VN')}</strong>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                } else {
+                    html += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px 12px; text-align: center; color: #999;">
+                            <i class="fas fa-info-circle"></i> Không có chi tiết đơn hàng
+                        </td>
+                    </tr>`;
+                }
+                
+                return html;
             }).join('');
         }
     },
@@ -1101,7 +1105,7 @@ const anomalyConfig = {
         color: '#ffc107',
         getExplanation: (m) => {
             const ratio = m.checkpoint_ratio || 0;
-            return `Khách hàng tập trung ${ratio}% đơn hàng vào thời điểm chốt số KPI.`;
+            return `Khách hàng tập trung ${ratio}% đơn hàng vào thời điểm chốt số KPI (12-14 và 26-28).`;
         },
         renderEvidence: (evidence) => {
             if (!evidence || evidence.length === 0) {
@@ -1113,17 +1117,62 @@ const anomalyConfig = {
                     row.comparison.includes('Giữa tháng') || 
                     row.comparison.includes('Cuối tháng')
                 );
+                const hasOrders = row.orders && row.orders.length > 0;
                 
-                return `
-                <tr style="border-bottom: 1px solid #eee; ${isCheckpoint ? 'background: #fff3cd;' : ''}">
-                    <td style="padding: 10px;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;">${row.comparison} ${isCheckpoint ? '⚠️' : ''}</td>
-                    <td style="padding: 10px;">
-                        <small class="text-muted">${row.order_count || 0} đơn</small>
+                let html = `
+                <tr style="border-bottom: 2px solid #ddd; background: ${isCheckpoint ? '#fff3cd' : '#f8f9fa'};">
+                    <td style="padding: 12px; font-weight: 600; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.period} ${isCheckpoint ? '⚠️' : ''}
                     </td>
-                </tr>
-                `;
+                    <td style="padding: 12px; font-weight: 700; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.value}
+                    </td>
+                    <td style="padding: 12px; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.comparison}
+                    </td>
+                    <td style="padding: 12px;">
+                        ${hasOrders ? `
+                        <div style="font-weight: 600; color: #667eea; margin-bottom: 5px;">
+                            📦 Chi tiết ${row.orders.length} đơn hàng ${isCheckpoint ? '(CHECKPOINT)' : ''}:
+                        </div>
+                        ` : ''}
+                    </td>
+                </tr>`;
+                
+                if (hasOrders) {
+                    row.orders.forEach((order, idx) => {
+                        const orderDate = order.order_date ? 
+                            new Date(order.order_date).toLocaleDateString('vi-VN') : 'N/A';
+                        
+                        html += `
+                        <tr style="border-bottom: 1px solid #eee; background: ${isCheckpoint ? '#fffbf0' : (idx % 2 === 0 ? '#fff' : '#fafafa')};">
+                            <td style="padding: 8px 12px;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                    <div style="min-width: 90px;">
+                                        <i class="fas fa-calendar-day" style="color: ${isCheckpoint ? '#ffc107' : '#28a745'};"></i>
+                                        <strong style="color: ${isCheckpoint ? '#ffc107' : '#28a745'};">${orderDate}</strong>
+                                    </div>
+                                    <div style="min-width: 100px;">
+                                        <i class="fas fa-file-invoice" style="color: #667eea;"></i>
+                                        <code style="background: #e3f2fd; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+                                            ${order.order_code || 'N/A'}
+                                        </code>
+                                    </div>
+                                    <div style="min-width: 120px;">
+                                        <i class="fas fa-user-tie" style="color: #fd7e14;"></i>
+                                        <span style="color: #fd7e14; font-weight: 500;">${order.employee?.emp_code || 'N/A'}</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <i class="fas fa-id-badge" style="color: #6c757d;"></i>
+                                        <span style="color: #333;">${order.employee?.emp_name || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                
+                return html;
             }).join('');
         }
     },
@@ -1145,20 +1194,68 @@ const anomalyConfig = {
             return evidence.map(row => {
                 const orderCount = parseInt(row.comparison) || 0;
                 const isHighVolume = orderCount >= 5;
+                const hasOrders = row.orders && row.orders.length > 0;
                 
-                return `
-                <tr style="border-bottom: 1px solid #eee; ${isHighVolume ? 'background: #fff3cd;' : ''}">
-                    <td style="padding: 10px;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;">${row.comparison} ${isHighVolume ? '⚠️ DỒN DẬP' : ''}</td>
-                    <td style="padding: 10px;">
-                        <small class="text-muted">${orderCount} đơn</small>
+                let html = `
+                <tr style="border-bottom: 2px solid #ddd; background: ${isHighVolume ? '#fff3cd' : '#f8f9fa'};">
+                    <td style="padding: 12px; font-weight: 600; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.period} ${isHighVolume ? '⚠️' : ''}
                     </td>
-                </tr>
-                `;
+                    <td style="padding: 12px; font-weight: 700; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.value}
+                    </td>
+                    <td style="padding: 12px; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.comparison} ${isHighVolume ? '⚠️ DỒN DẬP' : ''}
+                    </td>
+                    <td style="padding: 12px;">
+                        ${hasOrders ? `
+                        <div style="font-weight: 600; color: #667eea; margin-bottom: 5px;">
+                            📦 Chi tiết ${row.orders.length} đơn hàng ${isHighVolume ? '(DỒN DẬP)' : ''}:
+                        </div>
+                        ` : ''}
+                    </td>
+                </tr>`;
+                
+                if (hasOrders) {
+                    row.orders.forEach((order, idx) => {
+                        const orderDate = order.order_date ? 
+                            new Date(order.order_date).toLocaleDateString('vi-VN') : 'N/A';
+                        const orderTime = order.order_time || '';
+                        
+                        html += `
+                        <tr style="border-bottom: 1px solid #eee; background: ${isHighVolume ? '#fffbf0' : (idx % 2 === 0 ? '#fff' : '#fafafa')};">
+                            <td style="padding: 8px 12px;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                    <div style="min-width: 90px;">
+                                        <i class="fas fa-calendar-day" style="color: ${isHighVolume ? '#dc3545' : '#28a745'};"></i>
+                                        <strong style="color: ${isHighVolume ? '#dc3545' : '#28a745'};">${orderDate}</strong>
+                                        ${orderTime ? `<small style="color: #999; margin-left: 3px;">${orderTime}</small>` : ''}
+                                    </div>
+                                    <div style="min-width: 100px;">
+                                        <i class="fas fa-file-invoice" style="color: #667eea;"></i>
+                                        <code style="background: #e3f2fd; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+                                            ${order.order_code || 'N/A'}
+                                        </code>
+                                    </div>
+                                    <div style="min-width: 120px;">
+                                        <i class="fas fa-user-tie" style="color: #fd7e14;"></i>
+                                        <span style="color: #fd7e14; font-weight: 500;">${order.employee?.emp_code || 'N/A'}</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <i class="fas fa-id-badge" style="color: #6c757d;"></i>
+                                        <span style="color: #333;">${order.employee?.emp_name || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                
+                return html;
             }).join('');
         }
     },
+    
     
     'product_concentration': {
         icon: '📦',
@@ -1196,13 +1293,70 @@ const anomalyConfig = {
             if (!evidence || evidence.length === 0) {
                 return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
-            return evidence.map(row => `
-                <tr style="border-bottom: 1px solid #eee; ${row.orders == 0 ? 'background: #fff3cd;' : ''}">
-                    <td style="padding: 10px;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;" colspan="2">${row.orders} đơn ${row.orders == 0 ? '⚠️ NGHỈ' : ''}</td>
-                </tr>
-            `).join('');
+            
+            return evidence.map(row => {
+                const hasOrders = row.orders && row.orders.length > 0;
+                const isGap = !hasOrders || row.orders.length === 0;
+                
+                let html = `
+                <tr style="border-bottom: 2px solid #ddd; background: ${isGap ? '#fff3cd' : '#f8f9fa'};">
+                    <td style="padding: 12px; font-weight: 600; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.period}
+                    </td>
+                    <td style="padding: 12px; font-weight: 700; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.value}
+                    </td>
+                    <td style="padding: 12px; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.comparison} ${isGap ? '⚠️ NGHỈ' : ''}
+                    </td>
+                    <td style="padding: 12px;">
+                        ${hasOrders ? `
+                        <div style="font-weight: 600; color: #667eea; margin-bottom: 5px;">
+                            📦 Chi tiết ${row.orders.length} đơn hàng:
+                        </div>
+                        ` : `
+                        <div style="text-align: center; color: #856404; font-weight: 600;">
+                            <i class="fas fa-exclamation-triangle"></i> Không có giao dịch trong tháng này
+                        </div>
+                        `}
+                    </td>
+                </tr>`;
+                
+                if (hasOrders) {
+                    row.orders.forEach((order, idx) => {
+                        const orderDate = order.order_date ? 
+                            new Date(order.order_date).toLocaleDateString('vi-VN') : 'N/A';
+                        
+                        html += `
+                        <tr style="border-bottom: 1px solid #eee; ${idx % 2 === 0 ? 'background: #fff;' : 'background: #fafafa;'}">
+                            <td style="padding: 8px 12px;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                    <div style="min-width: 90px;">
+                                        <i class="fas fa-calendar-day" style="color: #28a745;"></i>
+                                        <strong style="color: #28a745;">${orderDate}</strong>
+                                    </div>
+                                    <div style="min-width: 100px;">
+                                        <i class="fas fa-file-invoice" style="color: #667eea;"></i>
+                                        <code style="background: #e3f2fd; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+                                            ${order.order_code || 'N/A'}
+                                        </code>
+                                    </div>
+                                    <div style="min-width: 120px;">
+                                        <i class="fas fa-user-tie" style="color: #fd7e14;"></i>
+                                        <span style="color: #fd7e14; font-weight: 500;">${order.employee?.emp_code || 'N/A'}</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <i class="fas fa-id-badge" style="color: #6c757d;"></i>
+                                        <span style="color: #333;">${order.employee?.emp_name || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                
+                return html;
+            }).join('');
         }
     },
     
@@ -1257,13 +1411,69 @@ const anomalyConfig = {
                 return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
             
-            return evidence.map((row, idx) => `
-                <tr style="border-bottom: 1px solid #eee; ${idx === 0 ? 'background: #fff3cd;' : ''}">
-                    <td style="padding: 10px;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;" colspan="2">${row.comparison} ${idx === 0 ? '⚠️ CAO NHẤT' : ''}</td>
-                </tr>
-            `).join('');
+            return evidence.map((row, idx) => {
+                const isHighest = idx === 0;
+                const hasOrders = row.orders && row.orders.length > 0;
+                
+                let html = `
+                <tr style="border-bottom: 2px solid #ddd; background: ${isHighest ? '#fff3cd' : '#f8f9fa'};">
+                    <td style="padding: 12px; font-weight: 600; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.period} ${isHighest ? '⚠️' : ''}
+                    </td>
+                    <td style="padding: 12px; font-weight: 700; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.value}
+                    </td>
+                    <td style="padding: 12px; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.comparison} ${isHighest ? '⚠️ CAO NHẤT' : ''}
+                    </td>
+                    <td style="padding: 12px;">
+                        ${hasOrders ? `
+                        <div style="font-weight: 600; color: #667eea; margin-bottom: 5px;">
+                            📦 Chi tiết đơn hàng:
+                        </div>
+                        ` : ''}
+                    </td>
+                </tr>`;
+                
+                if (hasOrders) {
+                    row.orders.forEach((order) => {
+                        const orderDate = order.order_date ? 
+                            new Date(order.order_date).toLocaleDateString('vi-VN') : 'N/A';
+                        
+                        html += `
+                        <tr style="border-bottom: 1px solid #eee; background: ${isHighest ? '#fffbf0' : '#fff'};">
+                            <td style="padding: 8px 12px;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                    <div style="min-width: 90px;">
+                                        <i class="fas fa-calendar-day" style="color: #28a745;"></i>
+                                        <strong style="color: #28a745;">${orderDate}</strong>
+                                    </div>
+                                    <div style="min-width: 100px;">
+                                        <i class="fas fa-file-invoice" style="color: #667eea;"></i>
+                                        <code style="background: #e3f2fd; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+                                            ${order.order_code || 'N/A'}
+                                        </code>
+                                    </div>
+                                    <div style="min-width: 120px;">
+                                        <i class="fas fa-user-tie" style="color: #fd7e14;"></i>
+                                        <span style="color: #fd7e14; font-weight: 500;">${order.employee?.emp_code || 'N/A'}</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <i class="fas fa-id-badge" style="color: #6c757d;"></i>
+                                        <span style="color: #333;">${order.employee?.emp_name || 'N/A'}</span>
+                                    </div>
+                                    <div style="min-width: 100px; text-align: right;">
+                                        <i class="fas fa-dollar-sign" style="color: #28a745;"></i>
+                                        <strong style="color: #28a745;">${parseFloat(order.order_amount || 0).toLocaleString('vi-VN')}</strong>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                
+                return html;
+            }).join('');
         }
     },
     
@@ -1278,15 +1488,71 @@ const anomalyConfig = {
             if (!evidence || evidence.length === 0) {
                 return '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
             }
+            
             return evidence.map(row => {
                 const noActivity = row.comparison && row.comparison.includes('Không có');
-                return `
-                <tr style="border-bottom: 1px solid #eee; ${noActivity ? 'background: #f8d7da;' : ''}">
-                    <td style="padding: 10px;">${row.period}</td>
-                    <td style="padding: 10px; font-weight: 600;">${row.value}</td>
-                    <td style="padding: 10px;" colspan="2">${row.comparison} ${noActivity ? '⚠️ NGỪNG' : ''}</td>
-                </tr>
-            `}).join('');
+                const isSpike = row.period && row.period.includes('Spike');
+                const hasOrders = row.orders && row.orders.length > 0;
+                
+                let html = `
+                <tr style="border-bottom: 2px solid #ddd; background: ${noActivity ? '#f8d7da' : (isSpike ? '#fff3cd' : '#f8f9fa')};">
+                    <td style="padding: 12px; font-weight: 600; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.period} ${noActivity ? '⚠️' : ''}
+                    </td>
+                    <td style="padding: 12px; font-weight: 700; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.value}
+                    </td>
+                    <td style="padding: 12px; vertical-align: top;" rowspan="${hasOrders ? row.orders.length + 1 : 1}">
+                        ${row.comparison} ${noActivity ? '⚠️ NGỪNG' : ''}
+                    </td>
+                    <td style="padding: 12px;">
+                        ${hasOrders ? `
+                        <div style="font-weight: 600; color: #667eea; margin-bottom: 5px;">
+                            📦 Chi tiết ${row.orders.length} đơn hàng:
+                        </div>
+                        ` : `
+                        <div style="text-align: center; color: #721c24; font-weight: 600;">
+                            <i class="fas fa-ban"></i> Không có giao dịch
+                        </div>
+                        `}
+                    </td>
+                </tr>`;
+                
+                if (hasOrders) {
+                    row.orders.forEach((order, idx) => {
+                        const orderDate = order.order_date ? 
+                            new Date(order.order_date).toLocaleDateString('vi-VN') : 'N/A';
+                        
+                        html += `
+                        <tr style="border-bottom: 1px solid #eee; background: ${isSpike ? '#fffbf0' : (idx % 2 === 0 ? '#fff' : '#fafafa')};">
+                            <td style="padding: 8px 12px;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                    <div style="min-width: 90px;">
+                                        <i class="fas fa-calendar-day" style="color: #28a745;"></i>
+                                        <strong style="color: #28a745;">${orderDate}</strong>
+                                    </div>
+                                    <div style="min-width: 100px;">
+                                        <i class="fas fa-file-invoice" style="color: #667eea;"></i>
+                                        <code style="background: #e3f2fd; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+                                            ${order.order_code || 'N/A'}
+                                        </code>
+                                    </div>
+                                    <div style="min-width: 120px;">
+                                        <i class="fas fa-user-tie" style="color: #fd7e14;"></i>
+                                        <span style="color: #fd7e14; font-weight: 500;">${order.employee?.emp_code || 'N/A'}</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <i class="fas fa-id-badge" style="color: #6c757d;"></i>
+                                        <span style="color: #333;">${order.employee?.emp_name || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                }
+                
+                return html;
+            }).join('');
         }
     }
 };
