@@ -377,20 +377,20 @@ class AnomalyDetectionModel {
     
     return $monthlyResults;
 }
-
 private function getOrderDetailsForMonth($custCode, $year, $month) {
     $sql = "SELECT DISTINCT
                 DATE(o.OrderDate) as order_date,
                 o.OrderNumber as order_code,
                 o.DSRCode as emp_code,
                 d.TenNVBH as emp_name,
+                d.MaGSBH as emp_supervisor,
                 o.TotalNetAmount as order_amount
             FROM orderdetail o
             LEFT JOIN dskh d ON o.DSRCode = d.MaNVBH
             WHERE o.CustCode = ?
             AND o.RptYear = ?
             AND o.RptMonth = ?
-            GROUP BY DATE(o.OrderDate), o.OrderNumber, o.DSRCode, d.TenNVBH, o.TotalNetAmount
+            GROUP BY DATE(o.OrderDate), o.OrderNumber, o.DSRCode, d.TenNVBH, d.MaGSBH, o.TotalNetAmount
             ORDER BY o.OrderDate ASC, o.OrderNumber ASC";
     
     $stmt = $this->conn->prepare($sql);
@@ -406,7 +406,8 @@ private function getOrderDetailsForMonth($custCode, $year, $month) {
             'order_amount' => $order['order_amount'],
             'employee' => [
                 'emp_code' => $order['emp_code'] ?? 'N/A',
-                'emp_name' => $order['emp_name'] ?? 'N/A'
+                'emp_name' => $order['emp_name'] ?? 'Chưa có tên',
+                'emp_supervisor' => $order['emp_supervisor'] ?? 'N/A'
             ]
         ];
     }
