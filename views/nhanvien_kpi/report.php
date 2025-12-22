@@ -87,10 +87,16 @@ renderNavbar($currentPage);
                         <small class="text-muted">khách/ngày</small>
                     </div>
                     
-                    <div class="col-md-2 d-flex align-items-end">
+                    <div class="col-md-1" style="padding-top: 30px;">
                         <button type="submit" class="btn btn-primary w-100">
                             <i class="fas fa-search"></i> Phân Tích
                         </button>
+                        
+                    </div>
+                    <div class="col-md-1" style="padding-top: 30px;">
+                        <a href="?action=nhanvien_report" class="btn btn-secondary w-100">
+                            <i class="fas fa-sync"></i> Làm Mới
+                        </a>
                     </div>
                 </div>
                 

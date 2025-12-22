@@ -1,4 +1,3 @@
-
 <?php
 $currentPage = 'import';
 require_once dirname(__DIR__) . '/components/navbar.php';
@@ -84,10 +83,10 @@ renderNavbar($currentPage);
                         </button>
                     </div>
                     <div class="col-md-1">
-                <a href="nhanvien_report.php" class="btn btn-secondary">
-                    <i class="fas fa-sync"></i> Làm Mới
-                </a>
-            </div>
+                        <a href="?action=nhanvien_report" class="btn btn-secondary w-100">
+                            <i class="fas fa-sync"></i> Làm Mới
+                        </a>
+                    </div>
                 </div>
             </form>
 
@@ -169,10 +168,11 @@ renderNavbar($currentPage);
                             <tr>
                                 <th class="text-center" style="width: 60px;">#</th>
                                 <th style="width: 100px;">Mã NV</th>
-                                <th>Tên Nhân Viên</th>
-                                <th>Tỉnh</th>
-                                <th class="text-end">DS Tìm Kiếm</th>
-                                <th class="text-end">DS Tiến Độ</th>
+                                <th style="width: 150px;">Tên Nhân Viên</th>
+                                <th style="width: 100px;">Mã GSBH</th>
+                                <th style="width: 80px;">Tỉnh</th>
+                                <th class="text-end">DS Tháng Tìm Kiếm</th>
+                                <th class="text-end">DS Tiến Độ Tìm Kiếm</th>
                                 <th class="text-end">% Tiến Độ</th>
                                 <th class="text-center">Chi Tiết</th>
                                 <th class="text-end">Trạng Thái</th>
@@ -200,6 +200,7 @@ renderNavbar($currentPage);
                                 </td>
                                 <td><strong><?= htmlspecialchars($r['ma_nv']) ?></strong></td>
                                 <td><?= htmlspecialchars($r['ten_nv'] ?? '') ?></td>
+                                <td><span class="badge bg-info text-dark"><?= htmlspecialchars($r['ma_gsbh'] ?: 'N/A') ?></span></td>
                                 <td><?= htmlspecialchars($r['tinh'] ?? '') ?></td>
                                 <td class="text-end"><?= number_format($r['ds_tim_kiem'], 0) ?>đ</td>
                                 <td class="text-end"><?= number_format($r['ds_tien_do'], 0) ?>đ</td>
@@ -227,7 +228,7 @@ renderNavbar($currentPage);
                             </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <tr><td colspan="9" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted py-5">Không có dữ liệu</td></tr>
                         <?php endif; ?>
                         </tbody>
                     </table>
@@ -265,211 +266,303 @@ renderNavbar($currentPage);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+// ✅ GLOBAL VARIABLES
+let currentEmployeeData = null;
+let currentBenchmark = null;
 
-async function showCustomerList(empCode, event) {
-    event.preventDefault();
-    
-    // Lấy dữ liệu từ server
-    const params = new URLSearchParams(window.location.search);
-    const response = await fetch(`nhanvien_kpi.php?action=get_customers&dsr_code=${empCode}&${params}`);
-    const customers = await response.json();
-    
-    // Hiển thị
-    document.getElementById('empCode').textContent = empCode;
-    const content = document.getElementById('customerListContent');
-    
-    if (customers.length === 0) {
-        content.innerHTML = 'Không có dữ liệu';
-    } else {
-        let html = `
-            
-                
-                    
-                        STT
-                        Mã KH
-                        Tên KH
-                        Địa chỉ
-                        Tỉnh
-                        Đơn hàng
-                        Doanh số
-                        Lần đầu
-                        Lần cuối
-                    
-                
-                
-        `;
-        
-        customers.forEach((c, i) => {
-            html += `
-                
-                    ${i+1}
-                    ${c.CustCode}
-                    ${c.customer_name || 'N/A'}
-                    ${c.customer_address || 'N/A'}
-                    ${c.customer_province || 'N/A'}
-                    ${c.total_orders}
-                    ${Number(c.total_sales).toLocaleString()}
-                    ${c.first_contact}
-                    ${c.last_contact}
-                
-            `;
-        });
-        
-        html += '';
-        content.innerHTML = html;
-    }
-    
-    const modal = new bootstrap.Modal(document.getElementById('customerListModal'));
-    modal.show();
-}
-
-function showReportDetails(jsonData, jsonBenchmark) {
+async function showReportDetails(jsonData, jsonBenchmark) {
     try {
         const data = JSON.parse(jsonData);
         const benchmark = JSON.parse(jsonBenchmark);
         
+        // Lưu vào global để dùng cho tabs
+        currentEmployeeData = data;
+        currentBenchmark = benchmark;
+        
         document.getElementById('modalEmpName').textContent = data.ten_nv + ' (' + data.ma_nv + ')';
         
-        // Khoảng thời gian
-        const dsTBKhoang_NV = data.ds_tien_do;
-        const dsTBKhoang_Chung = benchmark.ds_tb_chung_khoang;
-        const dsMaxKhoang_NV = data.ds_ngay_cao_nhat_nv_khoang;
-        const dsMaxKhoang_Chung = benchmark.ds_ngay_cao_nhat_tb_khoang;
+        // Render tab Thông Tin Nhân Viên (mặc định)
+        renderEmployeeInfoTab();
         
-        // Tháng
-        const dsTBThang_NV = data.ds_tong_thang_nv;
-        const dsTBThang_Chung = benchmark.ds_tb_chung_thang;
-        const dsMaxThang_NV = data.ds_ngay_cao_nhat_nv_thang;
-        const dsMaxThang_Chung = benchmark.ds_ngay_cao_nhat_tb_thang;
-        
-        // Ngày hoạt động
-        const soNgayKhoang_NV = data.so_ngay_co_doanh_so_khoang || 0;
-        const soNgayThang_NV = data.so_ngay_co_doanh_so_thang || 0;
-        const soNgayTrongKhoang = benchmark.so_ngay || 1;
-        const soNgayTrongThang = benchmark.so_ngay_trong_thang || 1;
-        
-        const formatCurrency = (val) => {
-            if (isNaN(val) || val === 0) return '0đ';
-            return parseFloat(val).toLocaleString('vi-VN') + 'đ';
-        };
-        
-        const calcPercent = (emp, system) => {
-            if (system === 0 || isNaN(system)) return 0;
-            return ((emp - system) / system * 100);
-        };
-        
-        const getCompareIcon = (emp, system) => {
-            return (emp >= system) ? '✅' : '⚠️';
-        };
-        
-        const getCompareColor = (emp, system) => {
-            return (emp >= system) ? '#28a745' : '#dc3545';
-        };
-        
-        let html = `
-            <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
-                <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
-                    <i class="fas fa-user-circle"></i> Thông Tin Nhân Viên
-                </h6>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div><strong>Mã NV:</strong> ${escapeHtml(data.ma_nv)}</div>
-                    <div><strong>Tên:</strong> ${escapeHtml(data.ten_nv)}</div>
-                    <div><strong>Tỉnh:</strong> ${escapeHtml(data.tinh || 'N/A')}</div>
-                </div>
-            </div>
-
-            <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
-                <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
-                    <i class="fas fa-calendar-days"></i> So Sánh Trong Khoảng Thời Gian
-                </h6>
-                
-                <div style="margin-bottom: 10px;">
-                    <strong>📊 DS TB/Ngày (NV):</strong> ${formatCurrency(dsTBKhoang_NV)}
-                </div>
-                <div style="margin-bottom: 10px;">
-                    <strong>📊 DS TB/Ngày (Chung):</strong> ${formatCurrency(dsTBKhoang_Chung)}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>📊 Chênh Lệch:</strong> 
-                    <span style="color: ${getCompareColor(dsTBKhoang_NV, dsTBKhoang_Chung)};">
-                        ${getCompareIcon(dsTBKhoang_NV, dsTBKhoang_Chung)} ${Math.abs(calcPercent(dsTBKhoang_NV, dsTBKhoang_Chung)).toFixed(1)}%
-                    </span>
-                </div>
-                
-                <div style="margin-bottom: 10px;">
-                    <strong>📈 DS Ngày Cao Nhất (NV):</strong> ${formatCurrency(dsMaxKhoang_NV)}
-                </div>
-                <div style="margin-bottom: 10px;">
-                    <strong>📈 DS Ngày Cao Nhất TB (Chung):</strong> ${formatCurrency(dsMaxKhoang_Chung)}
-                </div>
-                <div>
-                    <strong>📈 Chênh Lệch:</strong> 
-                    <span style="color: ${getCompareColor(dsMaxKhoang_NV, dsMaxKhoang_Chung)};">
-                        ${getCompareIcon(dsMaxKhoang_NV, dsMaxKhoang_Chung)} ${Math.abs(calcPercent(dsMaxKhoang_NV, dsMaxKhoang_Chung)).toFixed(1)}%
-                    </span>
-                </div>
-            </div>
-
-            <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
-                <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
-                    <i class="fas fa-calendar-alt"></i> So Sánh Trong Tháng
-                </h6>
-                
-                <div style="margin-bottom: 10px;">
-                    <strong>📋 DS Tháng (NV):</strong> ${formatCurrency(dsTBThang_NV)}
-                </div>
-                <div style="margin-bottom: 10px;">
-                    <strong>📋 DS TB/Ngày/NV (Chung):</strong> ${formatCurrency(dsTBThang_Chung)}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>📋 % So Với Chung:</strong> 
-                    <span style="color: ${getCompareColor(dsTBThang_NV, dsTBThang_Chung)};">
-                        ${getCompareIcon(dsTBThang_NV, dsTBThang_Chung)} ${Math.abs(calcPercent(dsTBThang_NV, dsTBThang_Chung)).toFixed(1)}%
-                    </span>
-                </div>
-                
-                <div style="margin-bottom: 10px;">
-                    <strong>📈 DS Ngày Cao Nhất (NV-Tháng):</strong> ${formatCurrency(dsMaxThang_NV)}
-                </div>
-                <div style="margin-bottom: 10px;">
-                    <strong>📈 DS Ngày Cao Nhất TB (Chung-Tháng):</strong> ${formatCurrency(dsMaxThang_Chung)}
-                </div>
-                <div>
-                    <strong>📈 Chênh Lệch:</strong> 
-                    <span style="color: ${getCompareColor(dsMaxThang_NV, dsMaxThang_Chung)};">
-                        ${getCompareIcon(dsMaxThang_NV, dsMaxThang_Chung)} ${Math.abs(calcPercent(dsMaxThang_NV, dsMaxThang_Chung)).toFixed(1)}%
-                    </span>
-                </div>
-            </div>
-
-            <div style="background: white; padding: 20px; border-radius: 10px;">
-                <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
-                    <i class="fas fa-calendar-check"></i> Ngày Hoạt Động
-                </h6>
-                <div style="margin-bottom: 10px;">
-                    <strong>📅 Ngày Có Doanh Số (Khoảng):</strong> ${soNgayKhoang_NV} / ${soNgayTrongKhoang} ngày
-                </div>
-                <div style="margin-bottom: 10px;">
-                    <strong>📊 % Hoạt Động (Khoảng):</strong> ${(soNgayTrongKhoang > 0 ? (soNgayKhoang_NV / soNgayTrongKhoang * 100) : 0).toFixed(1)}%
-                </div>
-                
-                <div style="margin-bottom: 10px; margin-top: 15px;">
-                    <strong>📅 Ngày Có Doanh Số (Tháng):</strong> ${soNgayThang_NV} / ${soNgayTrongThang} ngày
-                </div>
-                <div>
-                    <strong>📊 % Hoạt Động (Tháng):</strong> ${(soNgayTrongThang > 0 ? (soNgayThang_NV / soNgayTrongThang * 100) : 0).toFixed(1)}%
-                </div>
-            </div>
-        `;
-        
-        document.getElementById('modalContent').innerHTML = html;
     } catch (e) {
         console.error('Error parsing data:', e);
         document.getElementById('modalContent').innerHTML = '<p class="text-danger"><strong>Lỗi tải dữ liệu:</strong> ' + e.message + '</p>';
     }
 }
 
+function renderEmployeeInfoTab() {
+    const data = currentEmployeeData;
+    const benchmark = currentBenchmark;
+    
+    // Khoảng thời gian
+    const dsTBKhoang_NV = data.ds_tien_do;
+    const dsTBKhoang_Chung = benchmark.ds_tb_chung_khoang;
+    const dsMaxKhoang_NV = data.ds_ngay_cao_nhat_nv_khoang;
+    const dsMaxKhoang_Chung = benchmark.ds_ngay_cao_nhat_tb_khoang;
+    
+    // Tháng
+    const dsTBThang_NV = data.ds_tong_thang_nv;
+    const dsTBThang_Chung = benchmark.ds_tb_chung_thang;
+    const dsMaxThang_NV = data.ds_ngay_cao_nhat_nv_thang;
+    const dsMaxThang_Chung = benchmark.ds_ngay_cao_nhat_tb_thang;
+    
+    // Ngày hoạt động
+    const soNgayKhoang_NV = data.so_ngay_co_doanh_so_khoang || 0;
+    const soNgayThang_NV = data.so_ngay_co_doanh_so_thang || 0;
+    const soNgayTrongKhoang = benchmark.so_ngay || 1;
+    const soNgayTrongThang = benchmark.so_ngay_trong_thang || 1;
+    
+    const formatCurrency = (val) => {
+        if (isNaN(val) || val === 0) return '0đ';
+        return parseFloat(val).toLocaleString('vi-VN') + 'đ';
+    };
+    
+    const calcPercent = (emp, system) => {
+        if (system === 0 || isNaN(system)) return 0;
+        return ((emp - system) / system * 100);
+    };
+    
+    const getCompareIcon = (emp, system) => {
+        return (emp >= system) ? '✅' : '⚠️';
+    };
+    
+    const getCompareColor = (emp, system) => {
+        return (emp >= system) ? '#28a745' : '#dc3545';
+    };
+    
+    let html = `
+        <!-- ✅ TABS -->
+        <ul class="nav nav-tabs mb-3" id="detailTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info-content" 
+                        type="button" role="tab" onclick="renderEmployeeInfoTab()">
+                    <i class="fas fa-user"></i> Thông Tin NV
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-content" 
+                        type="button" role="tab" onclick="renderOrdersTab()">
+                    <i class="fas fa-shopping-cart"></i> Đơn Hàng
+                </button>
+            </li>
+        </ul>
+        
+        <!-- TAB CONTENT -->
+        <div class="tab-content" id="detailTabContent">
+            <div class="tab-pane fade show active" id="info-content" role="tabpanel">
+                <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                    <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
+                        <i class="fas fa-user-circle"></i> Thông Tin Nhân Viên
+                    </h6>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><strong>Mã NV:</strong> ${escapeHtml(data.ma_nv)}</div>
+                        <div><strong>Tên:</strong> ${escapeHtml(data.ten_nv)}</div>
+                        <div><strong>Mã GSBH:</strong> <span class="badge bg-info">${escapeHtml(data.ma_gsbh || 'N/A')}</span></div>
+                        <div><strong>Tỉnh:</strong> ${escapeHtml(data.tinh || 'N/A')}</div>
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                    <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
+                        <i class="fas fa-calendar-days"></i> So Sánh Trong Khoảng Thời Gian
+                    </h6>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <strong>📊 DS TB/Ngày (NV):</strong> ${formatCurrency(dsTBKhoang_NV)}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>📊 DS TB/Ngày (Chung):</strong> ${formatCurrency(dsTBKhoang_Chung)}
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>📊 Chênh Lệch:</strong> 
+                        <span style="color: ${getCompareColor(dsTBKhoang_NV, dsTBKhoang_Chung)};">
+                            ${getCompareIcon(dsTBKhoang_NV, dsTBKhoang_Chung)} ${Math.abs(calcPercent(dsTBKhoang_NV, dsTBKhoang_Chung)).toFixed(1)}%
+                        </span>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <strong>📈 DS Ngày Cao Nhất (NV):</strong> ${formatCurrency(dsMaxKhoang_NV)}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>📈 DS Ngày Cao Nhất TB (Chung):</strong> ${formatCurrency(dsMaxKhoang_Chung)}
+                    </div>
+                    <div>
+                        <strong>📈 Chênh Lệch:</strong> 
+                        <span style="color: ${getCompareColor(dsMaxKhoang_NV, dsMaxKhoang_Chung)};">
+                            ${getCompareIcon(dsMaxKhoang_NV, dsMaxKhoang_Chung)} ${Math.abs(calcPercent(dsMaxKhoang_NV, dsMaxKhoang_Chung)).toFixed(1)}%
+                        </span>
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                    <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
+                        <i class="fas fa-calendar-alt"></i> So Sánh Trong Tháng
+                    </h6>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <strong>📋 DS Tháng (NV):</strong> ${formatCurrency(dsTBThang_NV)}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>📋 DS TB/Ngày/NV (Chung):</strong> ${formatCurrency(dsTBThang_Chung)}
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>📋 % So Với Chung:</strong> 
+                        <span style="color: ${getCompareColor(dsTBThang_NV, dsTBThang_Chung)};">
+                            ${getCompareIcon(dsTBThang_NV, dsTBThang_Chung)} ${Math.abs(calcPercent(dsTBThang_NV, dsTBThang_Chung)).toFixed(1)}%
+                        </span>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <strong>📈 DS Ngày Cao Nhất (NV-Tháng):</strong> ${formatCurrency(dsMaxThang_NV)}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>📈 DS Ngày Cao Nhất TB (Chung-Tháng):</strong> ${formatCurrency(dsMaxThang_Chung)}
+                    </div>
+                    <div>
+                        <strong>📈 Chênh Lệch:</strong> 
+                        <span style="color: ${getCompareColor(dsMaxThang_NV, dsMaxThang_Chung)};">
+                            ${getCompareIcon(dsMaxThang_NV, dsMaxThang_Chung)} ${Math.abs(calcPercent(dsMaxThang_NV, dsMaxThang_Chung)).toFixed(1)}%
+                        </span>
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 20px; border-radius: 10px;">
+                    <h6 style="border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 15px;">
+                        <i class="fas fa-calendar-check"></i> Ngày Hoạt Động
+                    </h6>
+                    <div style="margin-bottom: 10px;">
+                        <strong>📅 Ngày Có Doanh Số (Khoảng):</strong> ${soNgayKhoang_NV} / ${soNgayTrongKhoang} ngày
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>📊 % Hoạt Động (Khoảng):</strong> ${(soNgayTrongKhoang > 0 ? (soNgayKhoang_NV / soNgayTrongKhoang * 100) : 0).toFixed(1)}%
+                    </div>
+                    
+                    <div style="margin-bottom: 10px; margin-top: 15px;">
+                        <strong>📅 Ngày Có Doanh Số (Tháng):</strong> ${soNgayThang_NV} / ${soNgayTrongThang} ngày
+                    </div>
+                    <div>
+                        <strong>📊 % Hoạt Động (Tháng):</strong> ${(soNgayTrongThang > 0 ? (soNgayThang_NV / soNgayTrongThang * 100) : 0).toFixed(1)}%
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="orders-content" role="tabpanel">
+                <div id="ordersTableContainer">
+                    <p class="text-center"><i class="fas fa-spinner fa-spin"></i> Đang tải...</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('modalContent').innerHTML = html;
+}
+
+async function renderOrdersTab() {
+    const container = document.getElementById('ordersTableContainer');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="text-center"><i class="fas fa-spinner fa-spin"></i> Đang tải đơn hàng...</p>';
+    
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const tu_ngay = params.get('tu_ngay');
+        const den_ngay = params.get('den_ngay');
+        const dsr_code = currentEmployeeData.ma_nv;
+        
+        // ✅ FIX: Đảm bảo URL đúng với action
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('action', 'get_employee_orders');
+        currentUrl.searchParams.set('dsr_code', dsr_code);
+        currentUrl.searchParams.set('tu_ngay', tu_ngay);
+        currentUrl.searchParams.set('den_ngay', den_ngay);
+        
+        console.log('Fetching orders from:', currentUrl.toString()); // Debug
+        
+        const response = await fetch(currentUrl.toString());
+        const text = await response.text();
+        
+        console.log('Response text:', text.substring(0, 200)); // Debug
+        
+        let orders;
+        try {
+            orders = JSON.parse(text);
+        } catch (parseError) {
+            console.error('JSON Parse Error:', parseError);
+            console.error('Response was:', text);
+            container.innerHTML = `<p class="text-danger">Lỗi parse JSON. Kiểm tra console để xem response.</p>`;
+            return;
+        }
+        
+        if (orders.error) {
+            container.innerHTML = `<p class="text-danger">${orders.error}</p>`;
+            return;
+        }
+        
+        if (!orders || orders.length === 0) {
+            container.innerHTML = '<p class="text-center text-muted">Không có đơn hàng nào</p>';
+            return;
+        }
+        
+        // Tính tổng
+        let totalAmount = 0;
+        orders.forEach(o => totalAmount += parseFloat(o.so_tien || 0));
+        
+        let html = `
+            <div class="alert alert-info">
+                <strong>📊 Tổng quan:</strong> ${orders.length} đơn hàng | 
+                <strong>Tổng tiền:</strong> ${totalAmount.toLocaleString('vi-VN')}đ
+            </div>
+            
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-hover">
+                    <thead class="table-light" style="position: sticky; top: 0; z-index: 5;">
+                        <tr>
+                            <th>STT</th>
+                            <th>Mã Đơn</th>
+                            <th>Ngày Đặt</th>
+                            <th>Mã KH</th>
+                            <th>Tên KH</th>
+                            <th>Địa Chỉ</th>
+                            <th>Tỉnh</th>
+                            <th class="text-end">Số Tiền</th>
+                            <th class="text-center">SL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        orders.forEach((order, index) => {
+            html += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><small><strong>${escapeHtml(order.ma_don)}</strong></small></td>
+                    <td><small>${escapeHtml(order.ngay_dat)}</small></td>
+                    <td><small>${escapeHtml(order.ma_kh)}</small></td>
+                    <td><small>${escapeHtml(order.ten_kh)}</small></td>
+                    <td><small>${escapeHtml(order.dia_chi_kh || '-')}</small></td>
+                    <td><small>${escapeHtml(order.tinh_kh || '-')}</small></td>
+                    <td class="text-end"><small><strong>${parseFloat(order.so_tien).toLocaleString('vi-VN')}đ</strong></small></td>
+                    <td class="text-center"><small>${order.so_luong || 0}</small></td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading orders:', error);
+        container.innerHTML = `<p class="text-danger">Lỗi tải dữ liệu: ${error.message}</p>`;
+    }
+}
+
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;

@@ -62,9 +62,11 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
             <span class="navbar-brand mb-0 h1">
                 <i class="fas fa-handshake me-2"></i>Gắn kết Hoa Linh (GKHL)
             </span>
-            <a href="gkhl.php" class="btn btn-light">
-                <i class="fas fa-upload me-2"></i>Import Dữ liệu
-            </a>
+            <div class="col-md-1">
+                        <a href="?action=nhanvien_report" class="btn btn-secondary w-100">
+                            <i class="fas fa-sync"></i> Làm Mới
+                        </a>
+                    </div>
         </div>
     </nav>
 
@@ -116,7 +118,7 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
                                value="<?= htmlspecialchars($filters['ma_kh_dms']) ?>">
                     </div>
                     <div class="col-md-1 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100">
+                        <button type="submit" class="btn btn-primary w-100" style="height: 38px;">
                             <i class="fas fa-search"></i>
                         </button>
                     </div>

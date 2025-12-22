@@ -92,9 +92,11 @@ renderNavbar($currentPage, $periodDisplay ?? '');
             <span class="navbar-brand mb-0 h1">
                 <i class="fas fa-chart-bar me-2"></i>Báo cáo Khách hàng
             </span>
-            <a href="index.php" class="btn btn-light">
-                <i class="fas fa-upload me-2"></i>Import Dữ liệu
-            </a>
+            <div class="col-md-1">
+                        <a href="?action=nhanvien_report" class="btn btn-secondary w-100">
+                            <i class="fas fa-sync"></i> Làm Mới
+                        </a>
+                    </div>
         </div>
     </nav>
 

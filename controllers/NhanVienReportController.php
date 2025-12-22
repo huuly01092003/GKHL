@@ -1,7 +1,7 @@
 <?php
 /**
  * ✅ CONTROLLER TỐI ƯU - Báo Cáo Doanh Số Nhân Viên
- * Thay vì loop → Xử lý BATCH 1 lần
+ * ✅ UPDATED: Thêm API lấy chi tiết đơn hàng
  */
 
 require_once 'models/NhanVienReportModel.php';
@@ -11,6 +11,37 @@ class NhanVienReportController {
 
     public function __construct() {
         $this->model = new NhanVienReportModel();
+    }
+
+    /**
+     * ✅ MỚI: API LẤY CHI TIẾT ĐƠN HÀNG CỦA NHÂN VIÊN
+     */
+    public function getEmployeeOrders() {
+        // ✅ Xóa output buffer trước đó (nếu có)
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        header('Content-Type: application/json; charset=utf-8');
+        
+        try {
+            $dsr_code = $_GET['dsr_code'] ?? '';
+            $tu_ngay = $_GET['tu_ngay'] ?? '';
+            $den_ngay = $_GET['den_ngay'] ?? '';
+            
+            if (empty($dsr_code) || empty($tu_ngay) || empty($den_ngay)) {
+                echo json_encode(['error' => 'Thiếu tham số'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            
+            $orders = $this->model->getEmployeeOrderDetails($dsr_code, $tu_ngay, $den_ngay);
+            echo json_encode($orders, JSON_UNESCAPED_UNICODE);
+            exit;
+            
+        } catch (Exception $e) {
+            echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     }
 
     public function showReport() {
@@ -125,7 +156,8 @@ class NhanVienReportController {
                     
                     $row = [
                         'ma_nv' => $emp['DSRCode'],
-                        'ten_nv' => 'NV_' . $emp['DSRCode'],
+                        'ten_nv' => !empty($emp['ten_nhan_vien']) ? $emp['ten_nhan_vien'] : ('NV_' . $emp['DSRCode']),
+                        'ma_gsbh' => !empty($emp['ma_gsbh']) ? $emp['ma_gsbh'] : 'N/A',
                         'tinh' => $emp['DSRTypeProvince'] ?? '',
                         'ds_tim_kiem' => $ds_tim_kiem,
                         'ds_tien_do' => $ds_tien_do,

@@ -45,9 +45,11 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
     <nav class="navbar navbar-custom navbar-dark">
         <div class="container-fluid">
             <span class="navbar-brand"><i class="fas fa-users me-2"></i>Danh sách Khách hàng</span>
-            <a href="dskh.php" class="btn btn-light">
-                <i class="fas fa-upload me-2"></i>Import
-            </a>
+            <div class="col-md-1">
+                        <a href="?action=nhanvien_report" class="btn btn-secondary w-100">
+                            <i class="fas fa-sync"></i> Làm Mới
+                        </a>
+                    </div>
         </div>
     </nav>
 
@@ -66,14 +68,7 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <select name="quan_huyen" class="form-select">
-                            <option value="">-- Tất cả quận/huyện --</option>
-                            <?php foreach ($districts as $d): ?>
-                                <option value="<?= $d ?>" <?= $filters['quan_huyen'] === $d ? 'selected' : '' ?>><?= $d ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    
                     <div class="col-md-2">
                         <select name="loai_kh" class="form-select">
                             <option value="">-- Loại KH --</option>
@@ -86,7 +81,7 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
                         <input type="text" name="ma_kh" class="form-control" placeholder="Mã KH" value="<?= $filters['ma_kh'] ?>">
                     </div>
                     <div class="col-md-1">
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i></button>
+                        <button type="submit" class="btn btn-primary w-100" style="height: 37px;"><i class="fas fa-search"></i></button>
                     </div>
                 </div>
             </form>

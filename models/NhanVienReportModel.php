@@ -1,7 +1,7 @@
 <?php
 /**
  * ✅ MODEL TỐI ƯU - Báo Cáo Doanh Số Nhân Viên
- * Thay vì loop từng nhân viên → Query 1 lần cho TẤT CẢ
+ * ✅ UPDATED: Thêm function lấy chi tiết đơn hàng khách hàng
  */
 
 require_once 'config/database.php';
@@ -15,7 +15,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ LẤY TẤT CẢ DỮ LIỆU NHÂN VIÊN 1 LẦN (FIX CHO MARIADB)
+     * ✅ LẤY TẤT CẢ DỮ LIỆU NHÂN VIÊN 1 LẦN + TÊN + MÃ GSBH
      */
     public function getAllEmployeesWithStats($tu_ngay, $den_ngay, $thang) {
         list($year, $month) = explode('-', $thang);
@@ -23,6 +23,10 @@ class NhanVienReportModel {
         $sql = "SELECT 
                     o.DSRCode,
                     o.DSRTypeProvince,
+                    
+                    -- ✅ TÊN NHÂN VIÊN và MÃ GSBH từ bảng DSKH (dùng MAX để tránh duplicate)
+                    MAX(nv_info.TenNVBH) as ten_nhan_vien,
+                    MAX(nv_info.MaGSBH) as ma_gsbh,
                     
                     -- TRONG KHOẢNG NGÀY
                     SUM(CASE WHEN DATE(o.OrderDate) >= ? AND DATE(o.OrderDate) <= ? 
@@ -39,6 +43,13 @@ class NhanVienReportModel {
                     COALESCE(MAX(ds_thang.max_daily), 0) as ds_ngay_cao_nhat_nv_thang
                     
                 FROM orderdetail o
+                
+                -- ✅ LEFT JOIN để lấy thông tin nhân viên
+                LEFT JOIN (
+                    SELECT DISTINCT MaNVBH, TenNVBH, MaGSBH
+                    FROM dskh
+                    WHERE MaNVBH IS NOT NULL AND MaNVBH != ''
+                ) nv_info ON o.DSRCode = nv_info.MaNVBH
                 
                 -- LEFT JOIN để lấy max daily cho KHOẢNG
                 LEFT JOIN (
@@ -115,7 +126,32 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ TỔNG THEO THÁNG - 1 QUERY DUY NHẤT (FIX AMBIGUOUS)
+     * ✅ MỚI: LẤY CHI TIẾT ĐỖN HÀNG CỦA NHÂN VIÊN TRONG KHOẢNG THỜI GIAN
+     */
+    public function getEmployeeOrderDetails($dsr_code, $tu_ngay, $den_ngay) {
+        $sql = "SELECT 
+                    o.OrderNumber as ma_don,
+                    o.OrderDate as ngay_dat,
+                    o.CustCode as ma_kh,
+                    COALESCE(d.TenKH, 'N/A') as ten_kh,
+                    COALESCE(d.DiaChi, '') as dia_chi_kh,
+                    COALESCE(d.Tinh, '') as tinh_kh,
+                    o.TotalNetAmount as so_tien,
+                    o.Qty as so_luong
+                FROM orderdetail o
+                LEFT JOIN dskh d ON o.CustCode = d.MaKH
+                WHERE o.DSRCode = ?
+                AND DATE(o.OrderDate) >= ?
+                AND DATE(o.OrderDate) <= ?
+                ORDER BY o.OrderDate DESC, o.OrderNumber DESC";
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([$dsr_code, $tu_ngay, $den_ngay]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * ✅ TỔNG THEO THÁNG - 1 QUERY DUY NHẤT
      */
     public function getSystemStatsForMonth($thang) {
         list($year, $month) = explode('-', $thang);
@@ -158,7 +194,7 @@ class NhanVienReportModel {
     }
 
     /**
-     * ✅ TỔNG THEO KHOẢNG - 1 QUERY DUY NHẤT (FIX AMBIGUOUS)
+     * ✅ TỔNG THEO KHOẢNG - 1 QUERY DUY NHẤT
      */
     public function getSystemStatsForRange($tu_ngay, $den_ngay) {
         $sql = "SELECT 

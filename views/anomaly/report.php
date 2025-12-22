@@ -156,10 +156,10 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
             <div>
                 <a href="report.php" class="btn btn-light me-2">
                     <i class="fas fa-chart-bar me-2"></i>Báo cáo thường
-                </a>
-                <a href="index.php" class="btn btn-outline-light">
-                    <i class="fas fa-home me-2"></i>Trang chủ
-                </a>
+                </a>       
+                        <a href="?action=nhanvien_report" class="btn btn-secondary">
+                            <i class="fas fa-sync"></i> Làm Mới
+                        </a>
             </div>
         </div>
     </nav>
@@ -170,7 +170,7 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
                 <i class="fas fa-shield-alt me-2"></i><strong>Phát hiện hành vi bất thường của khách hàng</strong>
             </h5>
             <p class="mb-0">
-                Phân tích 15 chỉ số bất thường để phát hiện khách hàng có hành vi đáng ngờ. 
+                Phân tích các chỉ số bất thường để phát hiện khách hàng có hành vi đáng ngờ. 
                 Điểm càng cao thể hiện mức độ nghi vấn càng lớn.
             </p>
         </div>
@@ -261,8 +261,8 @@ require_once dirname(__DIR__) . '/components/navbar.php';renderNavbar($currentPa
                     </div>
 
                     <!-- Nút phân tích -->
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-danger btn-lg w-100">
+                    <div class="col-md-2 d-flex align-items-center">
+                        <button type="submit" class="btn btn-danger btn-lg w-100" style="height: 40px; margin-top: -10px;">
                             <i class="fas fa-search me-2"></i>Phân tích
                         </button>
                     </div>
